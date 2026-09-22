@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><link rel="icon" href="logo.png"><title>Home | Edit Simple Libraries</title><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"secondary-container":"#fdba74","primary":"#f07f2e","outline":"#8a7a6d","primary-fixed":"#ffe4cc","on-primary-fixed":"#3d1a00","inverse-surface":"#3a2e26","on-primary":"#ffffff","on-surface-variant":"#57493f","secondary-fixed-dim":"#fdc79a","primary-container":"#fb923c","inverse-primary":"#fdc79a","on-surface":"#2a1f17","on-background":"#2a1f17","outline-variant":"#e5d6c8","surface-container-lowest":"#ffffff","on-error-container":"#93000a","on-secondary":"#ffffff","tertiary-fixed":"#ffdbcc","error-container":"#ffdad6","secondary":"#f59e5b","surface":"#fffaf5","surface-container-high":"#ffe9d6","on-error":"#ffffff","inverse-on-surface":"#fff1e6","on-secondary-fixed-variant":"#c2570c","tertiary-container":"#a44100","tertiary":"#7e3000","on-primary-fixed-variant":"#c2570c","surface-tint":"#f07f2e","background":"#fffaf5","secondary-fixed":"#ffe4cc","surface-container-highest":"#fde0c7","error":"#ba1a1a","surface-dim":"#f3dcc8","on-secondary-fixed":"#3d1a00","surface-bright":"#fffaf5","surface-container-low":"#fff5ec","on-secondary-container":"#fffaf5","on-primary-container":"#fff1e6","primary-fixed-dim":"#fdc79a","on-tertiary":"#ffffff","surface-variant":"#fde0c7","tertiary-fixed-dim":"#ffb695","on-tertiary-fixed":"#351000","on-tertiary-fixed-variant":"#7b2f00","surface-container":"#ffeede","on-tertiary-container":"#ffd2be"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"margin-mobile":"1rem","gutter-mobile":"0.75rem","space-xl":"2.5rem","margin":"2rem","space-xs":"0.25rem","space-md":"1rem","space-sm":"0.5rem","space-lg":"1.5rem","gutter":"1.25rem"},"fontFamily":{"body-lg":["Inter"],"label-xs":["Inter"],"headline-xl-mobile":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"label-md":["Inter"],"body-md":["Inter"],"headline-md":["Plus Jakarta Sans"],"label-sm":["Inter"],"headline-xl":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"headline-lg-mobile":["Plus Jakarta Sans"],"body-sm":["Inter"]},"fontSize":{"body-lg":["18px",{"lineHeight":"28px","letterSpacing":"-0.005em","fontWeight":"400"}],"label-xs":["10px",{"lineHeight":"14px","letterSpacing":"0.04em","fontWeight":"600"}],"headline-xl-mobile":["32px",{"lineHeight":"40px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-lg":["36px",{"lineHeight":"44px","letterSpacing":"-0.02em","fontWeight":"600"}],"label-md":["14px",{"lineHeight":"20px","letterSpacing":"0.01em","fontWeight":"600"}],"body-md":["15px",{"lineHeight":"24px","letterSpacing":"0em","fontWeight":"400"}],"headline-md":["24px",{"lineHeight":"32px","letterSpacing":"-0.015em","fontWeight":"600"}],"label-sm":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"500"}],"headline-xl":["48px",{"lineHeight":"56px","letterSpacing":"-0.025em","fontWeight":"700"}],"headline-sm":["20px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"600"}],"headline-lg-mobile":["26px",{"lineHeight":"34px","letterSpacing":"-0.015em","fontWeight":"600"}],"body-sm":["13px",{"lineHeight":"20px","letterSpacing":"0.005em","fontWeight":"400"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased min-h-screen"><header class="sticky top-0 z-50 w-full bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/40"><div class="h-16 max-w-7xl mx-auto px-margin-mobile md:px-margin flex items-center justify-between gap-gutter"><div class="flex items-center gap-space-lg"><a class="flex items-center gap-space-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded" data-path="home" href="#"><img alt="Edit Simple Libraries Logo" class="h-8 w-auto object-contain" src="logo.png"/><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-bold">Edit Simple Libraries</span></a><nav class="hidden lg:flex items-center gap-space-lg" data-active-classes="text-primary font-label-md"><a aria-current="page" class="transition-colors text-primary font-label-md" data-path="home" href="#">Home</a><a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="videos" href="#">Videos</a><a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="images" href="#">Images</a><a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="music" href="#">Music</a><a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="templates" href="#">Templates</a><a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" data-path="collections" href="#">Collections</a></nav></div><div class="flex items-center gap-space-md"><button aria-label="Search assets" class="p-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-colors flex items-center justify-center" type="button"><span class="material-symbols-outlined text-[22px]">search</span></button><a class="hidden sm:inline-flex font-label-md text-label-md text-on-surface-variant hover:text-on-surface px-space-sm py-space-xs transition-colors" data-path="login" href="#">Login</a><a class="inline-flex items-center justify-center font-label-md text-label-md bg-primary text-on-primary hover:bg-primary-container px-space-md py-space-xs rounded-full shadow-sm hover:shadow transition-all" data-path="signup" href="#">Sign Up</a><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-space-xs shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-16 bg-surface min-h-[calc(100vh-16rem)]"><div class="flex flex-col w-full">
+<!-- Top Ambient Glow & Minimalist Search Hero -->
+<section class="relative w-full overflow-hidden bg-gradient-to-b from-surface-container-low/60 via-surface to-surface pb-space-xl">
+<div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[340px] bg-primary-fixed-dim/40 rounded-full blur-3xl pointer-events-none"></div>
+<div class="max-w-6xl mx-auto px-margin-mobile md:px-margin text-center relative z-10 pt-space-lg">
+<div class="inline-flex items-center gap-space-xs px-space-md py-1 bg-surface-container-high text-primary rounded-full mb-space-md">
+<span class="material-symbols-outlined text-[16px]">spark</span>
+<span class="font-label-sm text-label-sm font-semibold tracking-wide">SPRING 2026 CURATION LIVE</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl tracking-tight text-on-surface max-w-3xl mx-auto leading-tight">
+        Everything You Need <br class="hidden sm:inline"/>to Create.
+      </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-space-sm max-w-xl mx-auto">
+        Simple, high-quality creative assets for your next project.
+      </p>
+<!-- Central Search Bar Container -->
+<div class="mt-space-lg max-w-3xl mx-auto">
+<form class="relative bg-surface-container-lowest shadow-xl rounded-2xl p-2 sm:p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2" >
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-xl">
+<span class="material-symbols-outlined text-primary text-[20px]">category</span>
+<select aria-label="Media format type" class="bg-transparent font-label-md text-label-md text-on-surface font-semibold focus:outline-none cursor-pointer pr-2" id="media-filter">
+<option value="all">All Media</option>
+<option value="videos">Videos</option>
+<option value="images">Images</option>
+<option value="music">Music</option>
+<option value="templates">Templates</option>
+</select>
+</div>
+<div class="flex-1 flex items-center px-3 min-w-0">
+<span class="material-symbols-outlined text-outline text-[22px] mr-2 shrink-0">search</span>
+<input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none min-w-0" placeholder="Search videos, images, music, templates..." type="text"/>
+</div>
+<button class="inline-flex items-center justify-center gap-1.5 bg-primary text-on-primary font-label-md text-label-md px-space-lg py-3 rounded-xl hover:bg-primary-container transition-all shrink-0 active:scale-95 shadow-sm" type="submit">
+<span>Search</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</form>
+<!-- Search Suggestions -->
+<div class="flex flex-wrap items-center justify-center gap-2 mt-space-md text-on-surface-variant font-label-sm text-label-sm">
+<span class="text-outline font-medium mr-1">Trending Searches:</span>
+<button class="bg-surface-container-lowest px-3 py-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface" type="button">Cinematic</button>
+<button class="bg-surface-container-lowest px-3 py-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface" type="button">Travel</button>
+<button class="bg-surface-container-lowest px-3 py-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface" type="button">Business</button>
+<button class="bg-surface-container-lowest px-3 py-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface" type="button">Nature</button>
+<button class="bg-surface-container-lowest px-3 py-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface" type="button">Technology</button>
+<button class="bg-surface-container-lowest px-3 py-1.5 rounded-full hover:bg-surface-container-high transition-colors text-on-surface" type="button">Backgrounds</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Metric Pulse Accent Strip -->
+<section class="w-full max-w-7xl mx-auto px-margin-mobile md:px-margin -mt-6 relative z-20">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-gutter bg-surface-container-lowest rounded-2xl p-space-md shadow-md">
+<div class="flex items-center gap-space-sm pl-2">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">videocam</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm font-bold text-on-surface leading-tight">480K+</p>
+<p class="font-label-sm text-label-sm text-outline">Raw &amp; Log Clips</p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm pl-2">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[22px]">auto_awesome</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm font-bold text-on-surface leading-tight">99.8%</p>
+<p class="font-label-sm text-label-sm text-outline">Editorial Clearance</p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm pl-2">
+<div class="w-10 h-10 rounded-xl bg-tertiary-fixed flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[22px]">graphic_eq</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm font-bold text-on-surface leading-tight">48kHz</p>
+<p class="font-label-sm text-label-sm text-outline">Studio Masters</p>
+</div>
+</div>
+<div class="flex items-center gap-space-sm pl-2">
+<div class="w-10 h-10 rounded-xl bg-secondary-fixed flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[22px]">verified</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm font-bold text-on-surface leading-tight">Royalty-Free</p>
+<p class="font-label-sm text-label-sm text-outline">Global Commercial</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Category Section: Explore Our Libraries -->
+<section class="max-w-7xl mx-auto w-full px-margin-mobile md:px-margin py-space-xl">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-space-lg gap-space-sm">
+<div>
+<span class="font-label-xs text-label-xs uppercase tracking-widest text-primary font-bold">Catalog Classification</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mt-1">Explore Our Libraries</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Curated high-fidelity assets across 6 dedicated libraries.</p>
+</div>
+<a class="inline-flex items-center gap-1 font-label-md text-label-md text-primary font-semibold hover:underline" href="#">
+        Browse Complete Directory
+        <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</a>
+</div>
+<!-- 6 Primary Category Cards Bento -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- 1. Videos -->
+<a class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col" href="#">
+<div class="relative h-44 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Cinematic 4K camera rig on cinematic gimbal shooting high speed film set with soft indigo lens flare, rich shadows and subtle rim light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDLrZXEezFquXez76r44bYQWktyBglSnuHWgALlxj6WpodGFyxxIe978mefc77V5urSaYmzAIuEktzc41fk26fpk6TfMxOvq1Xe_nnhN50YUWi9Xb1hRHdNg9Zu-2lnsb3GQKbNiWHfkkihmdD27lEcLxISvOeOdQaJn69zZC7x6PvxopyN_PQhwYBfhsXR4eEMrd3I6FrqQQ03Pk0StpZsXbi2alVcDxSku3aF_6yEW6wG7mXaVrhG"/>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-transparent flex items-end p-space-md">
+<span class="font-label-sm text-label-sm font-semibold bg-surface-container-lowest/90 backdrop-blur-md px-2.5 py-1 rounded-full text-on-surface">120k+ Assets</span>
+</div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">Videos</h3>
+<span class="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 transition-all">north_east</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">4K, ProRes, Raw drone footage, cinematic cutaways, and seamless loops for narrative editing.</p>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-space-xs text-outline font-label-xs text-label-xs">
+<span>ProRes 422</span>
+<span>•</span>
+<span>60fps Rec.709</span>
+<span>•</span>
+<span>D-Log LUTs</span>
+</div>
+</div>
+</a>
+<!-- 2. Images -->
+<a class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col" href="#">
+<div class="relative h-44 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Editorial lifestyle photography studio with clean soft natural light, minimal concrete surfaces, organic plant textures, muted indigo accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByUAe_-xZBM558bORPs45U9Wk6EuxE_IUcyL_vgiaTRtkhO7h0KkeIIactVfnLKfs6szW0i7mXXdpgQSRkxVye8pE1WElzHCFFR7eqHj--GJhD5_671ZBRWksYHJouqzcRUBOzS1l55Ot9sVSUTIBPx4ogAboUi48ZDTHtqaLpnGrBgT5LFlSgO6NyFIb_LQG9t6UwquLfM7sIhOXDl6AF6mwIrnS0KpOlaSTeKtO55X4IFY5mCflO"/>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-transparent flex items-end p-space-md">
+<span class="font-label-sm text-label-sm font-semibold bg-surface-container-lowest/90 backdrop-blur-md px-2.5 py-1 rounded-full text-on-surface">250k+ Assets</span>
+</div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">Images</h3>
+<span class="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 transition-all">north_east</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">Uncompressed studio captures, authentic street reportage, and clean architectural stills.</p>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-space-xs text-outline font-label-xs text-label-xs">
+<span>RAW / DNG</span>
+<span>•</span>
+<span>Ultra High DPI</span>
+<span>•</span>
+<span>Color Profiled</span>
+</div>
+</div>
+</a>
+<!-- 3. Music -->
+<a class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col" href="#">
+<div class="relative h-44 overflow-hidden bg-gradient-to-tr from-surface-container to-secondary-container/30 flex items-center justify-center p-6">
+<div class="w-full space-y-2">
+<div class="flex items-center justify-between text-primary font-label-xs text-label-xs uppercase">
+<span>Dynamic Waveform</span>
+<span>Stereo Master</span>
+</div>
+<div class="flex items-end gap-1 h-14 justify-center">
+<div class="w-1.5 bg-primary/40 rounded-full h-6"></div>
+<div class="w-1.5 bg-primary/70 rounded-full h-10"></div>
+<div class="w-1.5 bg-primary rounded-full h-14"></div>
+<div class="w-1.5 bg-primary/90 rounded-full h-8"></div>
+<div class="w-1.5 bg-primary/50 rounded-full h-12"></div>
+<div class="w-1.5 bg-primary rounded-full h-14"></div>
+<div class="w-1.5 bg-primary/70 rounded-full h-7"></div>
+<div class="w-1.5 bg-primary/30 rounded-full h-4"></div>
+<div class="w-1.5 bg-primary/80 rounded-full h-11"></div>
+<div class="w-1.5 bg-primary rounded-full h-13"></div>
+<div class="w-1.5 bg-primary/60 rounded-full h-8"></div>
+</div>
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-transparent flex items-end p-space-md">
+<span class="font-label-sm text-label-sm font-semibold bg-surface-container-lowest/90 backdrop-blur-md px-2.5 py-1 rounded-full text-on-surface">45k+ Stems</span>
+</div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">Music</h3>
+<span class="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 transition-all">north_east</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">Production stems, modular loops, cinematic synth compositions, and commercial cuts.</p>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-space-xs text-outline font-label-xs text-label-xs">
+<span>Lossless WAV</span>
+<span>•</span>
+<span>Full Stems</span>
+<span>•</span>
+<span>YouTube Safe</span>
+</div>
+</div>
+</a>
+<!-- 4. Templates -->
+<a class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col" href="#">
+<div class="relative h-44 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Digital video editing workspace UI with sleek timeline tracks, keyframe motion curves, kinetic typography cards, indigo UI highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8B1DAh7-L7a34PcMViDwA206C3MyOH1dh1rrdB2NxiX3Pums6BiEbMsN9jESN8qMXv2YbClfsAnyeAHAR6a3638kXgqz7YJvpS55AJcd6tBDXM-rhNfWUJLrE7WjMvr1CD3dqGJXi9HbfCXMlddSnbbbRmcM_z5er0BkFiAlGgkn51LF2aoUXMlMNrND2faTvrAsCNE9vwlz-a95HfH1rTATAt3ckLfDID-ByypgZrylCLNris-lb"/>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-transparent flex items-end p-space-md">
+<span class="font-label-sm text-label-sm font-semibold bg-surface-container-lowest/90 backdrop-blur-md px-2.5 py-1 rounded-full text-on-surface">32k+ Packs</span>
+</div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">Templates</h3>
+<span class="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 transition-all">north_east</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">After Effects, Premiere MOGRTs, Final Cut titles, and DaVinci Resolve color nodes.</p>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-space-xs text-outline font-label-xs text-label-xs">
+<span>AE &amp; Premiere</span>
+<span>•</span>
+<span>DaVinci Node Kits</span>
+<span>•</span>
+<span>No Plugins</span>
+</div>
+</div>
+</a>
+<!-- 5. Sound Effects -->
+<a class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col" href="#">
+<div class="relative h-44 overflow-hidden bg-surface-container-highest flex items-center justify-center">
+<div class="p-space-md text-center">
+<div class="w-12 h-12 mx-auto rounded-full bg-surface-container-lowest flex items-center justify-center text-primary mb-2 shadow-sm">
+<span class="material-symbols-outlined text-[24px]">surround_sound</span>
+</div>
+<span class="font-label-xs text-label-xs uppercase tracking-widest text-on-surface-variant">Foley &amp; Ambience FX</span>
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-transparent flex items-end p-space-md">
+<span class="font-label-sm text-label-sm font-semibold bg-surface-container-lowest/90 backdrop-blur-md px-2.5 py-1 rounded-full text-on-surface">60k+ Samples</span>
+</div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">Sound Effects</h3>
+<span class="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 transition-all">north_east</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">Whooshes, cinematic risers, real room ambiences, transitions, and mechanical impacts.</p>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-space-xs text-outline font-label-xs text-label-xs">
+<span>96kHz 24-bit</span>
+<span>•</span>
+<span>Spatial Audio</span>
+<span>•</span>
+<span>Organized UCS</span>
+</div>
+</div>
+</a>
+<!-- 6. Graphics -->
+<a class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col" href="#">
+<div class="relative h-44 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Abstract 3D geometric glass composition with iridescent light refraction, geometric spheres and clean minimal studio shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbXb6VRQKTjqviD4240v9rMIx3bqrnV9w1POa4fSQb2CmtUW6jG5fYe3PelG5-2iLF6I2wwlHhMykP086EH9Nu2KTgsj1JA5x-hBnOwocJKeJ_y86bD3VxoyZ_TaNIZOZ6QZd8Rm-xmEXOsbAgJwdrSrlSou__0uP-BY_6HMx-56XDwGlYByF544wuzKsUzjihPQ8jQwVZqYbOOei4KIswVQECg3AcJOxEk23gI1yhQYADaPz0iwK1"/>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-transparent flex items-end p-space-md">
+<span class="font-label-sm text-label-sm font-semibold bg-surface-container-lowest/90 backdrop-blur-md px-2.5 py-1 rounded-full text-on-surface">85k+ Vectors &amp; 3D</span>
+</div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors">Graphics</h3>
+<span class="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 transition-all">north_east</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">Vector textures, UI kits, isolated 3D objects, clay mockups, and typography presets.</p>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-space-xs text-outline font-label-xs text-label-xs">
+<span>SVG + FBX</span>
+<span>•</span>
+<span>Alpha Channeled</span>
+<span>•</span>
+<span>Figma Ready</span>
+</div>
+</div>
+</a>
+</div>
+</section>
+<!-- Featured Assets Section -->
+<section class="bg-surface-container-low py-space-xl">
+<div class="max-w-7xl mx-auto w-full px-margin-mobile md:px-margin">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md mb-space-lg">
+<div>
+<span class="font-label-xs text-label-xs uppercase tracking-widest text-primary font-bold">Staff Selected</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mt-1">Featured Assets</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">High-bitrate studio submissions updated every morning.</p>
+</div>
+<!-- Filter Pills Bar -->
+<div class="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none" id="asset-filters">
+<button class="filter-btn active font-label-sm text-label-sm bg-on-surface text-surface px-4 py-2 rounded-full whitespace-nowrap shadow-sm" type="button">All</button>
+<button class="filter-btn font-label-sm text-label-sm bg-surface-container-lowest text-on-surface hover:bg-surface-container-high px-4 py-2 rounded-full whitespace-nowrap transition-colors" type="button">Trending</button>
+<button class="filter-btn font-label-sm text-label-sm bg-surface-container-lowest text-on-surface hover:bg-surface-container-high px-4 py-2 rounded-full whitespace-nowrap transition-colors" type="button">4K Footage</button>
+<button class="filter-btn font-label-sm text-label-sm bg-surface-container-lowest text-on-surface hover:bg-surface-container-high px-4 py-2 rounded-full whitespace-nowrap transition-colors" type="button">Photography</button>
+<button class="filter-btn font-label-sm text-label-sm bg-surface-container-lowest text-on-surface hover:bg-surface-container-high px-4 py-2 rounded-full whitespace-nowrap transition-colors" type="button">Audio Tracks</button>
+<button class="filter-btn font-label-sm text-label-sm bg-surface-container-lowest text-on-surface hover:bg-surface-container-high px-4 py-2 rounded-full whitespace-nowrap transition-colors" type="button">Motion Graphics</button>
+</div>
+</div>
+<!-- Assets Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- Media Card 1: 4K Video -->
+<div class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+<div class="relative aspect-video overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Cinematic aerial shot above misty coastal cliffs at sunrise with crashing emerald waves, high dynamic range and deep indigo shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpYlmNbU_w4ZO7FukMXM9IxM3JgewWrRcGtExbGH7XnX5_RyuqsacamzlsnNCYZ5yzr8Gt6G8wSkvqdQHN_qw2v1wWb5WqoVwVx-3pVfMxpzkg0LFTDZXwgS_SaIHKnV5RCIsKs_SNzRaQ8Sn-QnpOJqYDc2zb8L0KRMjehceIeASh7SSF8Xhy2SZY_OHIsvzSGv7c3s9MOHGR0FaYZMKMJPjWM-r0JH8AxGCSqRDINzHUstloQmq9"/>
+<div class="absolute top-3 left-3">
+<span class="font-label-xs text-label-xs bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-semibold px-2.5 py-1 rounded-md">4K Video</span>
+</div>
+<!-- Glass Quick Action Dock -->
+<div class="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+<button aria-label="Add to favorites" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-error transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+<button aria-label="Quick download" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-primary transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+<!-- Play Indicator Overlay -->
+<div class="absolute bottom-3 right-3 bg-inverse-surface/80 backdrop-blur-sm text-inverse-on-surface font-label-xs text-label-xs px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">play_arrow</span>
+<span>00:24</span>
+</div>
+</div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2">
+<h4 class="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">Nordic Coastal Drone Drift</h4>
+<button aria-label="Save item" class="text-outline hover:text-primary shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs font-label-xs text-label-xs text-on-surface-variant">
+<span>3840 x 2160 • 60 FPS</span>
+<span class="font-semibold text-primary">1.2 GB</span>
+</div>
+</div>
+</div>
+<!-- Media Card 2: RAW Image -->
+<div class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+<div class="relative aspect-video overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Monolithic brutalist architecture interior with cascading soft skylight, smooth curved concrete surfaces and deep ambient blue shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXtvDa8SWW8914QXYtpzPAxfwUw8Bi2O4jGXyQT50Pr3XG61TDzcQUYL0BvYNpEW_Pqeiy0aDvS_pm7uRgXzAcqAr0YOC1VP81qTREMlbM9zenoaWKdv6kb2Ge1uhpKQour3EYbxl0vnDiA33GEu9DT_NbtClaQ2K4Gp_x-2ttovwpYB3U2moC1JAn3CMv8nrHONR_eA05BHFKM0FY5hYPJvIpnZp4neoype7xbvjGcnGTYP4czN3a"/>
+<div class="absolute top-3 left-3">
+<span class="font-label-xs text-label-xs bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-semibold px-2.5 py-1 rounded-md">RAW Image</span>
+</div>
+<div class="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+<button aria-label="Add to favorites" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-error transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+<button aria-label="Quick download" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-primary transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2">
+<h4 class="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">Minimalist Concrete Rotunda</h4>
+<button aria-label="Save item" class="text-outline hover:text-primary shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs font-label-xs text-label-xs text-on-surface-variant">
+<span>8192 x 5464 • 14-bit DNG</span>
+<span class="font-semibold text-primary">64 MB</span>
+</div>
+</div>
+</div>
+<!-- Media Card 3: Lossless Audio Track -->
+<div class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+<div class="relative aspect-video bg-gradient-to-br from-surface-container-highest via-secondary-fixed to-surface-container-high p-5 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-xs text-label-xs bg-primary text-on-primary font-semibold px-2.5 py-1 rounded-md">Lossless Audio</span>
+<button aria-label="Play track" class="w-10 h-10 rounded-full bg-surface-container-lowest shadow-md flex items-center justify-center text-primary hover:scale-105 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]">play_arrow</span>
+</button>
+</div>
+<!-- Minimal Mono-Color Waveform -->
+<div class="w-full flex items-end gap-1 h-12 pt-2">
+<div class="flex-1 bg-outline-variant rounded-sm h-1/4 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-1/2 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-3/4 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-full group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-2/3 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-1/3 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-5/6 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-4/5 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-1/2 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-2/3 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1 bg-outline-variant rounded-sm h-1/4 group-hover:bg-primary transition-colors"></div>
+</div>
+</div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2">
+<h4 class="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">Neon Horizon (Synth Odyssey)</h4>
+<button aria-label="Save item" class="text-outline hover:text-primary shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs font-label-xs text-label-xs text-on-surface-variant">
+<span>03:42 • 124 BPM • C Minor</span>
+<span class="font-semibold text-primary">WAV 48kHz</span>
+</div>
+</div>
+</div>
+<!-- Media Card 4: Motion Graphic / AE Template -->
+<div class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+<div class="relative aspect-video overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Kinetic typography motion presentation mockup card with ultra crisp sans-serif letters, clean editorial magazine aesthetics and soft indigo shadow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiwdkbSXggkSTJmxrmMe8mt6Zn1YfMNZ7xt6k8sf0RltrkcdBX5c0vTeJ3ZG6pb43uF5D1pmq6w86OBw94SifoNYb-Sb9x9t5hATmiMeIAH5k4MlENUVbntGlmXLX6q5UzYC93QN5P0kpdIcX0Ev19qg_f4hHW8Etlkt7wbb10vJGR6aoQEQWdusAFOi7ZOEhztkoNRkKooQTAbp6VIYp6316DwKtDvjEBcj13B9tmQlFMSNAPRRM4"/>
+<div class="absolute top-3 left-3">
+<span class="font-label-xs text-label-xs bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-semibold px-2.5 py-1 rounded-md">After Effects</span>
+</div>
+<div class="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+<button aria-label="Add to favorites" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-error transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+<button aria-label="Quick download" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-primary transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2">
+<h4 class="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">Editorial Pitch Presentation Kit</h4>
+<button aria-label="Save item" class="text-outline hover:text-primary shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs font-label-xs text-label-xs text-on-surface-variant">
+<span>32 Slides • 1080p / 4K • CC2024</span>
+<span class="font-semibold text-primary">340 MB</span>
+</div>
+</div>
+</div>
+<!-- Media Card 5: Nature 4K Drone -->
+<div class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+<div class="relative aspect-video overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Verdant pine forest valley wrapped in high alpine morning mist shot with cinema camera drone showing sharp needle details and serene atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEUtGLcjdlI8IOTSXmeZXSe7DtjLLRwtcHDYV5wWfVY7w5oPZGDbgfbUc9-9ILl2AXDO4PPK2-wMR3X8GSlTYGObz7NCS7aIAN2VypETvB6c8Wz9j0HUjhAUK_P1nait3MQnEHc13Z0SdYzzeLa5Yix_sjAUMes1hjztl5Cq2duBYec4ICK8KiLw5XG4K35sBwKrF6LnGv3gV9D60O4OkARasUbNthVIoZ1Mk0DARkY4yuM-WhzBMa"/>
+<div class="absolute top-3 left-3">
+<span class="font-label-xs text-label-xs bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-semibold px-2.5 py-1 rounded-md">4K Video</span>
+</div>
+<div class="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+<button aria-label="Add to favorites" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-error transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+<button aria-label="Quick download" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-primary transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+<div class="absolute bottom-3 right-3 bg-inverse-surface/80 backdrop-blur-sm text-inverse-on-surface font-label-xs text-label-xs px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">play_arrow</span>
+<span>00:38</span>
+</div>
+</div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2">
+<h4 class="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">Alpine Pine Canopy Flyover</h4>
+<button aria-label="Save item" class="text-outline hover:text-primary shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs font-label-xs text-label-xs text-on-surface-variant">
+<span>3840 x 2160 • 10-bit H.265</span>
+<span class="font-semibold text-primary">890 MB</span>
+</div>
+</div>
+</div>
+<!-- Media Card 6: 3D Render -->
+<div class="group bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+<div class="relative aspect-video overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Minimalist floating metallic chrome prism sculptures casting soft lavender and indigo reflections in a pristine gallery white space" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCx9CU3f6Z5BD66MCOkyzYHXX256aREf57gp5f9bDQYmU9dDtpi7D3AOQAWpKBNDvivgqFPyrXFZzyd5pZ6CgrTh4YC6_YbVV257paXuZjxxvNR-5SPo0ujSYyyR4RVrG6i5UjCO9y_wMMEWJ5REl9FgKW-F62UwAP6XUwklLo276dliQ48zHk50MeoQ-h5IKuesStzYb2ID-m2q2Qpn8nlzkwG2ZfVAH5tPk_xQm6dSusD7iIgmibl"/>
+<div class="absolute top-3 left-3">
+<span class="font-label-xs text-label-xs bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-semibold px-2.5 py-1 rounded-md">3D Asset</span>
+</div>
+<div class="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+<button aria-label="Add to favorites" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-error transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+<button aria-label="Quick download" class="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md text-on-surface flex items-center justify-center hover:text-primary transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</div>
+<div class="p-space-md">
+<div class="flex items-start justify-between gap-2">
+<h4 class="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">Chrome Prism Geometric Pack</h4>
+<button aria-label="Save item" class="text-outline hover:text-primary shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+</div>
+<div class="flex items-center justify-between mt-space-sm pt-space-xs font-label-xs text-label-xs text-on-surface-variant">
+<span>OBJ + FBX • 8K PBR Textures</span>
+<span class="font-semibold text-primary">512 MB</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Load More Action -->
+<div class="text-center mt-space-xl">
+<button class="inline-flex items-center gap-2 bg-surface-container-lowest font-label-md text-label-md text-on-surface hover:text-primary px-space-xl py-3.5 rounded-full shadow-sm hover:shadow transition-all" type="button">
+<span>Load More Discoveries</span>
+<span class="material-symbols-outlined text-[20px]">expand_more</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Popular Collections Horizontal Carousel -->
+<section class="py-space-xl w-full max-w-7xl mx-auto px-margin-mobile md:px-margin">
+<div class="flex items-end justify-between mb-space-lg">
+<div>
+<span class="font-label-xs text-label-xs uppercase tracking-widest text-primary font-bold">Curated Anthologies</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mt-1">Popular Collections</h2>
+</div>
+<div class="flex items-center gap-2">
+<button aria-label="Scroll left" class="w-10 h-10 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center shadow-sm hover:bg-surface-container-high transition-colors" id="scroll-left" type="button">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+</button>
+<button aria-label="Scroll right" class="w-10 h-10 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center shadow-sm hover:bg-surface-container-high transition-colors" id="scroll-right" type="button">
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Scrollable container -->
+<div class="flex gap-gutter overflow-x-auto pb-space-md scroll-smooth scrollbar-none snap-x snap-mandatory" id="collections-slider">
+<!-- Collection 1 -->
+<div class="snap-start shrink-0 w-[310px] sm:w-[360px] bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+<div class="relative h-48">
+<img class="w-full h-full object-cover" data-alt="Anamorphic 35mm film still of a nocturnal city street bathed in moody tungsten and deep cyan neons with subtle rain reflection" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmVcA3TzDt--u0eZYE6jl4V4yfCIlFDdrYva2LcUkE8JhN20pD8-aAYWgIaLAa1fXpLF0FDmS9daenQGJOfp4ZebyIEad7a3NZIdnV8JZe3igH_jj7VuVDBb5BNOlexwF6Uak4FJHfVROYii29R3_SeXfhC_LzLYXKJZ1med5soH_iH9K9hVHGBJar5m1QLz0lnwhBzXeXVUF4HAnP173uCnOY270-IXA8TdbTdqSwWncLndguLAJm"/>
+<div class="absolute top-3 right-3 bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-label-xs text-label-xs font-semibold px-2.5 py-1 rounded-full">
+            142 Assets
+          </div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Cinematic Stories</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2">Graded anamorphic cuts, low-light nightscapes, and emotional slow-burn score cues.</p>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-outline font-label-xs text-label-xs">
+<span>Curated by Alex Vance</span>
+<span class="text-primary font-semibold">View Anthology →</span>
+</div>
+</div>
+</div>
+<!-- Collection 2 -->
+<div class="snap-start shrink-0 w-[310px] sm:w-[360px] bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+<div class="relative h-48">
+<img class="w-full h-full object-cover" data-alt="Extreme sport backcountry skiing down untouched deep powder mountain slope at golden sunset with crisp frozen air particles" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeFJ7lrm3XclR0IhmGXcmc67jx_lUJ8hidtu5OhHRFYJ-l1pzYtK_--6Pq_yoyEbLB25vaj8nraCwN74aed2sJSzR9sxwB951392AJwAOkH--rYu69EOQBKEnfavyfqrRGaTEqE9KeDyI-2FBE8j5jhaOjQhGQ1SW5Cu3nHVjP_rMBtRRaYX0P6DsolWQyCzb-CMmBKlD_h50tgs3zNX069TEep9LSb3rAxaOGtAR0x7BhAMYyVc3K"/>
+<div class="absolute top-3 right-3 bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-label-xs text-label-xs font-semibold px-2.5 py-1 rounded-full">
+            218 Assets
+          </div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Travel &amp; Adventure</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2">High-octane expeditions, drone ridge lines, and natural terrain soundscapes.</p>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-outline font-label-xs text-label-xs">
+<span>Curated by Maya Lin</span>
+<span class="text-primary font-semibold">View Anthology →</span>
+</div>
+</div>
+</div>
+<!-- Collection 3 -->
+<div class="snap-start shrink-0 w-[310px] sm:w-[360px] bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+<div class="relative h-48">
+<img class="w-full h-full object-cover" data-alt="Modern glass architectural tech company boardroom with clean contemporary furniture and focused creative team brainstorming" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhNU1rurqZV8J6C6jlUWsnJVQDNCGKDdFGyDB9zJ4TWPmyRjZ5Hzse91MQZaPmfNp5vzzZkdPBG-dm9iXUffTbEReI6z3b2AuLicmKhGXzU9EljXSylbGwAYS6ZRi6SjoHNweayxWKs0E4V07x6HssbtdeLgeE4ZQ3tqrYzNajunGt0mLlWiqPf9RO_CjpY4v8YtH6kGr7vSkHNRFzy_yQwKb3g9cyKDH1tlIdhTQJobHvO_0zuo2t"/>
+<div class="absolute top-3 right-3 bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-label-xs text-label-xs font-semibold px-2.5 py-1 rounded-full">
+            96 Assets
+          </div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Modern Business</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2">Clean corporate interviews, enterprise pitch decks, and crisp tech transitions.</p>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-outline font-label-xs text-label-xs">
+<span>Curated by Studio North</span>
+<span class="text-primary font-semibold">View Anthology →</span>
+</div>
+</div>
+</div>
+<!-- Collection 4 -->
+<div class="snap-start shrink-0 w-[310px] sm:w-[360px] bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+<div class="relative h-48">
+<img class="w-full h-full object-cover" data-alt="Dynamic 9 to 16 vertical smartphone screens exhibiting vibrant typography animations, kinetic stickers, and trendy product showcases" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJePn6I6k_RiSXfPMCa7BTOXfd2ZmUJXpGDqt6xgiHZPMpOionEJY7lZkIIWUDDFnOpLZ-4EXr2BviCtCoJLFUb4rI2EJPOvxc8ygkBA4sfmscIu36IgPymCCkBYebapsIewrlKtvv7BUIf5Xv_dfUX5IzWJnaGDjJEdvPaBpzEcya_jrrJLKee4LZjymBwd1BfVmn7IcLTgwf3bZLi9FqCDxzg7-Ay7ObEmbil7hz2gDIAl5R7i8d"/>
+<div class="absolute top-3 right-3 bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-label-xs text-label-xs font-semibold px-2.5 py-1 rounded-full">
+            310 Assets
+          </div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Social Media Kits</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2">High retention vertical templates, reel hooks, motion title packs, and audio drops.</p>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-outline font-label-xs text-label-xs">
+<span>Curated by ReelLabs</span>
+<span class="text-primary font-semibold">View Anthology →</span>
+</div>
+</div>
+</div>
+<!-- Collection 5 -->
+<div class="snap-start shrink-0 w-[310px] sm:w-[360px] bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+<div class="relative h-48">
+<img class="w-full h-full object-cover" data-alt="Macro water droplet splashes on deep green tropical monstera leaf with pristine optical clarity and subtle morning backlighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBOdcMWeTqg-o9Qif6PBsyl4ed1xpOl-VE9iY0zV-lUXJx5jVKtvEezy5SyWkdmk08OufyrHsaVmKCoZvP98zfcUHkNWCymF7zhP1dTh41jh3EEZA-U8nGu2c8jxn3fROCY4x70Gd12ubzUgFDlEN1UrXWgQTroVJdvcUMbe3cES8s21BkcZwsstLO-AYij_QtahENN02HHYdhBwhc45i6VlkMvGCD8i5vAlSFwrBq4Tb-T1R92ElIq"/>
+<div class="absolute top-3 right-3 bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-label-xs text-label-xs font-semibold px-2.5 py-1 rounded-full">
+            180 Assets
+          </div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Untamed Nature</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2">Bio-luminescence, deep jungle flora, time-lapse storm clouds, and authentic rain audio.</p>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-outline font-label-xs text-label-xs">
+<span>Curated by BioVisual</span>
+<span class="text-primary font-semibold">View Anthology →</span>
+</div>
+</div>
+</div>
+<!-- Collection 6 -->
+<div class="snap-start shrink-0 w-[310px] sm:w-[360px] bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+<div class="relative h-48">
+<img class="w-full h-full object-cover" data-alt="Holographic transparent quantum chip rendering with subtle micro-circuit illumination in dark indigo clean void" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHpR9dO-Kkbb_rc6O2ZQdQ6Em5Ph5yLeVkdDY5G6oNpqpL_T5UVMxwSAu5iil8y7p7eMdoVXy3dsBUwwGoY-82CA0Kqo7vVFSXjZDr3ehCWcQg4oBp4foYX3PeRN_36XJ0FbNqdj3s72lBFyI1YXOxNGmHzgI1vBDfkiUS86DkulC8t8YAP5BbBoNGXUaWxt3DGVgk8vy7Q0GWopvPbylFmclSX5FpoMqa326b4VGrhP8qXFE8Tw70"/>
+<div class="absolute top-3 right-3 bg-inverse-surface/85 backdrop-blur-md text-inverse-on-surface font-label-xs text-label-xs font-semibold px-2.5 py-1 rounded-full">
+            125 Assets
+          </div>
+</div>
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Futuristic Tech</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2">HUD interfaces, procedural node textures, cybernetic visuals, and synthesized SFX.</p>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-outline font-label-xs text-label-xs">
+<span>Curated by MatrixFX</span>
+<span class="text-primary font-semibold">View Anthology →</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Simple Pricing Section -->
+<section class="bg-surface-container-low py-space-xl">
+<div class="max-w-6xl mx-auto w-full px-margin-mobile md:px-margin text-center">
+<span class="font-label-xs text-label-xs uppercase tracking-widest text-primary font-bold">Predictable Investment</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mt-1">Simple Plans</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xl mx-auto">
+        Transparent pricing for solo creators and production teams. No surprise license upgrades.
+      </p>
+<!-- Pricing Cards Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter mt-space-xl text-left items-stretch">
+<!-- Free Plan -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Free</h3>
+<span class="font-label-xs text-label-xs bg-surface-container-high px-2.5 py-1 rounded text-on-surface">Starter</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-1">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">$0</span>
+<span class="font-body-sm text-body-sm text-outline">/month</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">Essential exploration for hobbyists and preliminary storyboard drafts.</p>
+<ul class="space-y-space-sm mt-space-lg">
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Limited downloads (5 / mo)</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Basic library access</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Personal &amp; non-profit license</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-outline">
+<span class="material-symbols-outlined text-[18px]">close</span>
+<span>Commercial redistribution</span>
+</li>
+</ul>
+</div>
+<div class="mt-space-lg">
+<a class="w-full inline-flex items-center justify-center font-label-md text-label-md bg-surface-container text-on-surface hover:bg-surface-container-high py-3 rounded-xl transition-all" href="#">
+              Get Started
+            </a>
+</div>
+</div>
+<!-- Creator Plan (Featured / Most Popular) -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-xl relative flex flex-col justify-between">
+<div class="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-on-primary font-label-xs text-label-xs px-3.5 py-1 rounded-full uppercase tracking-wider font-bold shadow-sm">
+            Most Popular
+          </div>
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-primary font-bold">Creator</h3>
+<span class="font-label-xs text-label-xs bg-primary-fixed text-on-primary-fixed px-2.5 py-1 rounded font-semibold">Pro Level</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-1">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">$19</span>
+<span class="font-body-sm text-body-sm text-outline">/month billed annually</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">Unlimited velocity for independent filmmakers, editors, and YouTube creators.</p>
+<ul class="space-y-space-sm mt-space-lg">
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-[18px]">check_circle</span>
+<span class="font-medium">Unlimited downloads</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-[18px]">check_circle</span>
+<span class="font-medium">Full library access (all 6 libraries)</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-[18px]">check_circle</span>
+<span>Worldwide commercial use</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-[18px]">check_circle</span>
+<span>High-speed CDN downloads</span>
+</li>
+</ul>
+</div>
+<div class="mt-space-lg">
+<a class="w-full inline-flex items-center justify-center font-label-md text-label-md bg-primary text-on-primary hover:bg-primary-container py-3 rounded-xl transition-all shadow-md active:scale-98" href="#">
+              Start Free Trial
+            </a>
+</div>
+</div>
+<!-- Pro Plan -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Pro</h3>
+<span class="font-label-xs text-label-xs bg-surface-container-high px-2.5 py-1 rounded text-on-surface">Agencies</span>
+</div>
+<div class="mt-space-md flex items-baseline gap-1">
+<span class="font-headline-xl text-headline-xl font-bold text-on-surface">$39</span>
+<span class="font-body-sm text-body-sm text-outline">/month</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">Bespoke capabilities for production companies, broadcast studios, and agencies.</p>
+<ul class="space-y-space-sm mt-space-lg">
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Unlimited downloads</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Premium cinema assets &amp; 8K files</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Broadcast commercial license</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Priority 24/7 dedicated support</span>
+</li>
+<li class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-outline text-[18px]">check</span>
+<span>Team sharing (3 seats included)</span>
+</li>
+</ul>
+</div>
+<div class="mt-space-lg">
+<a class="w-full inline-flex items-center justify-center font-label-md text-label-md bg-surface-container text-on-surface hover:bg-surface-container-high py-3 rounded-xl transition-all" href="#">
+              Upgrade to Pro
+            </a>
+</div>
+</div>
+</div>
+<!-- Assurance Badges -->
+<div class="mt-space-xl flex flex-wrap items-center justify-center gap-space-lg text-outline font-label-xs text-label-xs">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">lock</span>
+<span>Encrypted 256-bit checkout</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">autorenew</span>
+<span>Cancel or switch anytime</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">gavel</span>
+<span>Lifetime legal indemnification</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Creator Callout Banner -->
+<section class="max-w-7xl mx-auto w-full px-margin-mobile md:px-margin py-space-xl">
+<div class="bg-primary rounded-2xl p-space-lg md:p-space-xl text-on-primary flex flex-col md:flex-row items-center justify-between gap-space-lg shadow-xl relative overflow-hidden">
+<div class="absolute -right-16 -bottom-16 w-80 h-80 bg-secondary-container/40 rounded-full blur-3xl pointer-events-none"></div>
+<div class="max-w-xl relative z-10 text-center md:text-left">
+<span class="font-label-xs text-label-xs uppercase tracking-widest text-primary-fixed font-bold">Artist Contributor Program</span>
+<h3 class="font-headline-lg text-headline-lg font-bold mt-1 text-on-primary">Make what moves the world. Earn on every download.</h3>
+<p class="font-body-md text-body-md text-primary-fixed mt-2">
+          Join 4,200+ directors, sound engineers, and 3D animators uploading raw footage and bespoke sound design.
+        </p>
+</div>
+<div class="flex flex-col sm:flex-row items-center gap-3 relative z-10 w-full sm:w-auto">
+<a class="w-full sm:w-auto inline-flex items-center justify-center font-label-md text-label-md bg-on-primary text-primary px-space-lg py-3 rounded-full hover:bg-surface-bright transition-all shadow-md font-semibold" href="#">
+          Become a Contributor
+        </a>
+<a class="w-full sm:w-auto inline-flex items-center justify-center font-label-md text-label-md bg-primary-container text-on-primary px-space-lg py-3 rounded-full hover:bg-opacity-90 transition-all font-semibold" href="#">
+          Submission Guidelines
+        </a>
+</div>
+</div>
+</section>
+<script>
+    // Slider horizontal scrolling micro-interaction
+    const slider = document.getElementById('collections-slider');
+    const scrollLeftBtn = document.getElementById('scroll-left');
+    const scrollRightBtn = document.getElementById('scroll-right');
+
+    if (slider && scrollLeftBtn && scrollRightBtn) {
+      scrollLeftBtn.addEventListener('click', () => {
+        slider.scrollBy({ left: -380, behavior: 'smooth' });
+      });
+      scrollRightBtn.addEventListener('click', () => {
+        slider.scrollBy({ left: 380, behavior: 'smooth' });
+      });
+    }
+
+    // Filter pill buttons active state toggle
+    const filterButtons = document.querySelectorAll('#asset-filters .filter-btn');
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => {
+          b.classList.remove('bg-on-surface', 'text-surface');
+          b.classList.add('bg-surface-container-lowest', 'text-on-surface');
+        });
+        btn.classList.add('bg-on-surface', 'text-surface');
+        btn.classList.remove('bg-surface-container-lowest', 'text-on-surface');
+      });
+    });
+  </script>
+</div></main><footer class="w-full bg-surface-container-low border-t border-outline-variant/30"><div class="max-w-7xl mx-auto px-margin-mobile md:px-margin pt-space-xl pb-space-lg"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-gutter mb-space-xl"><div class="lg:col-span-2 space-y-space-sm"><div class="flex items-center gap-space-sm"><img alt="Edit Simple Libraries Logo" class="h-7 w-auto object-contain" src="logo.png"/><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface font-bold">Edit Simple Libraries</span></div><p class="font-body-md text-body-md text-on-surface-variant max-w-sm">Simple, high-quality creative assets for your next project.</p></div><div class="space-y-space-sm"><h4 class="font-label-md text-label-md text-on-surface font-semibold uppercase tracking-wider">Libraries</h4><ul class="space-y-space-xs"><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Videos</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Images</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Music</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Templates</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Sound Effects</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Graphics</li></ul></div><div class="space-y-space-sm"><h4 class="font-label-md text-label-md text-on-surface font-semibold uppercase tracking-wider">Resources</h4><ul class="space-y-space-xs"><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Collections</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">New Releases</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Creator Community</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Blog</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Licensing Guide</li></ul></div><div class="space-y-space-sm"><h4 class="font-label-md text-label-md text-on-surface font-semibold uppercase tracking-wider">Company</h4><ul class="space-y-space-xs"><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">About Us</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Careers</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Press</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Brand Assets</li></ul></div><div class="space-y-space-sm"><h4 class="font-label-md text-label-md text-on-surface font-semibold uppercase tracking-wider">Support</h4><ul class="space-y-space-xs"><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Help Center</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Contact</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Pricing</li><li class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">FAQs</li></ul></div></div><div class="pt-space-lg border-t border-outline-variant/30 flex flex-col sm:flex-row items-center justify-between gap-space-sm"><p class="font-body-sm text-body-sm text-on-surface-variant">© 2026 Edit Simple Libraries. All rights reserved.</p><div class="flex items-center gap-space-lg"><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="terms" href="#">Terms</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="privacy" href="#">Privacy</a><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" data-path="cookies" href="#">Cookies</a></div></div></div></footer><script src="app.js"></script>
+</body></html>
