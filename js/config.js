@@ -1,0 +1,4 @@
+window.ES_CONFIG = {
+  SUPABASE_URL: "https://ddiwrhpaankvxnbjbbxl.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaXdyaHBhYW5rdnhuYmpiYnhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwOTk0MjcsImV4cCI6MjEwNTY3NTQyN30.WTwB1o074RL0gl1BY2kJQpyz4sBFpLjcX17O_n2QcSQ"
+};
