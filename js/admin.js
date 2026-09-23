@@ -79,11 +79,15 @@ function live() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   setInterval(() => { if (!document.hidden) refresh(); }, 60000);   // safety net
 }
+$('#pwEye').onclick = e => { const i = $('#loginForm').password; i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = i.type === 'password' ? 'visibility' : 'visibility_off'; };
 $('#loginForm').onsubmit = async e => {
-  e.preventDefault(); $('#loginErr').textContent = ''; const b = e.target.querySelector('button'); b.disabled = true; b.textContent = 'Logging in…';
-  const f = new FormData(e.target); const { error } = await sb.auth.signInWithPassword({ email: f.get('email'), password: f.get('password') });
-  b.disabled = false; b.textContent = 'Log in';
-  if (error) $('#loginErr').textContent = error.message; else { show('boot'); boot(); }
+  e.preventDefault(); const f = e.target, b = $('#loginBtn'), card = f; $('#loginErr').textContent = '';
+  b.disabled = true; b.querySelector('.lbl').classList.add('invisible'); b.querySelector('.spin').classList.remove('hidden');
+  const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
+  b.disabled = false; b.querySelector('.lbl').classList.remove('invisible'); b.querySelector('.spin').classList.add('hidden');
+  if (error) { $('#loginErr').textContent = error.message; card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); return; }
+  card.classList.add('hidden'); $('#loginOk').classList.remove('hidden');
+  setTimeout(() => { show('boot'); boot(true).then(() => { card.classList.remove('hidden'); $('#loginOk').classList.add('hidden'); f.reset(); }); }, 1100);
 };
 const logout = async () => { await sb.auth.signOut(); location.hash = ''; location.reload(); };
 $('#logout').onclick = logout; $('#logoutM').onclick = logout;
@@ -166,12 +170,13 @@ function renderVideos() {
     <td class="p-3 whitespace-nowrap">${esc(cname(v.category))}<br><span class="text-xs text-on-surface-variant">${esc(cname(v.subcategory))}</span></td>
     <td class="p-3 whitespace-nowrap text-xs">${esc(v.resolution)} · ${v.fps}fps<br>${dur(v.duration_seconds)} · ${esc(v.orientation)}</td>
     <td class="p-3">${statusChip(v)}</td>
-    <td class="p-3 text-right whitespace-nowrap">${isSuper() ? `
+    ${isSuper() ? `<td class="p-3 text-right whitespace-nowrap">
       ${v.status === 'pending' ? `<button data-approve="${v.id}" title="Approve" class="material-symbols-outlined p-1.5 rounded hover:bg-green-50 text-green-700">check_circle</button><button data-reject="${v.id}" title="Reject" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">cancel</button>` : ''}
       ${v.status === 'approved' ? `<button data-pub="${v.id}" title="${v.published ? 'Hide from site' : 'Show on site'}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">${v.published ? 'visibility_off' : 'visibility'}</button>` : ''}
       <button data-edit="${v.id}" title="Edit" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">edit</button>
-      <button data-del="${v.id}" title="Delete" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">delete</button>`
-      : `<button data-play="${v.id}" title="Preview" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">visibility</button>`}</td></tr>`).join('');
+      <button data-del="${v.id}" title="Delete" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">delete</button>
+</td>` : ''}</tr>`).join('');
+  $('#vActTh').classList.toggle('hidden', !isSuper());
 }
 ['#vq', '#vcat', '#vstat'].forEach(s => $(s).addEventListener('input', renderVideos));
 $('#vrows').onclick = async e => {
@@ -230,11 +235,17 @@ function fillCatSelects() {
 function fillSubs(sel) { const f = $('#vform'); f.subcategory.innerHTML = subsOf(f.category.value).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); if (sel) f.subcategory.value = sel; }
 $('#vform').category.onchange = () => fillSubs();
 
-let editing = null, thumbBlob = null, submitMode = 'submit';
+let editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null;
+// Fingerprint of the file (size + SHA-256 of first/last 4 MB) to detect re-uploads of the same video
+async function fingerprint(file) {
+  const MB = 4 * 1024 * 1024, parts = file.size <= 2 * MB ? [file] : [file.slice(0, MB), file.slice(file.size - MB)];
+  const buf = await new Blob([String(file.size), ...parts]).arrayBuffer();
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map(b => b.toString(16).padStart(2, '0')).join('');
+}
 const BTN = (mode, label, cls) => `<button ${mode ? `data-mode="${mode}"` : 'type="button" data-close'} class="px-4 py-2.5 rounded-lg ${cls}">${label}</button>`;
 function openVideo(v) {
   if (v && !isSuper()) return;
-  editing = v || null; thumbBlob = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
+  editing = v || null; thumbBlob = null; fileHash = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
   $('#vprev').classList.add('hidden'); $('#vprev').removeAttribute('src'); $('#progress').classList.add('hidden');
   $('#vmeta').textContent = 'Duration, resolution, frame rate, orientation and thumbnail are detected automatically.';
   const n = $('#vnote'); n.classList.toggle('hidden', isSuper()); n.textContent = 'Your video will be sent to a superadmin for review. It appears on the website only after approval.';
@@ -273,6 +284,7 @@ $('#vform').vfile.onchange = e => {
   const file = e.target.files[0]; if (!file) return; const f = $('#vform'), vid = $('#vprev');
   if (file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
   vid.src = URL.createObjectURL(file); vid.classList.remove('hidden'); $('#vmeta').textContent = 'Analysing video…';
+  fileHash = null; fingerprint(file).then(h => fileHash = h).catch(() => { });
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   vid.onloadedmetadata = async () => {
     f.duration_seconds.value = Math.round(vid.duration); const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h);
@@ -308,12 +320,13 @@ $('#vform').onsubmit = async e => {
       tags: [...new Set(f.tags.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]
     };
     if (isSuper()) { row.status = 'approved'; row.published = mode === 'approve'; } else { row.published = true; }
-    if (vf) { row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '70%'; if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail'); }
+    if (vf) { row.file_hash = fileHash || await fingerprint(vf).catch(() => null); row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '70%'; if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail'); }
     $('#bar').style.width = '90%'; $('#ptext').textContent = 'Saving details…';
     const old = editing ? { v: editing.video_url, t: editing.thumbnail_url } : {};
     if (editing && row.status === 'approved') { row.reviewed_by = me.id; row.review_note = null; }
-    const { error } = editing ? await sb.from('videos').update(row).eq('id', editing.id) : await sb.from('videos').insert(row);
+    const { data: saved, error } = editing ? await sb.from('videos').update(row).eq('id', editing.id).select('title').maybeSingle() : await sb.from('videos').insert(row).select('title').maybeSingle();
     if (error) throw error;
+    if (saved && saved.title !== row.title && /Variant \d+$/.test(saved.title)) toast(`Same video was uploaded before — saved as “${saved.title}”`);
     if (vf) { const stale = [old.v, old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale); }
     toast(!isSuper() ? 'Submitted — waiting for superadmin approval' : mode === 'approve' ? 'Approved — live on website' : 'Saved as draft (hidden from website)');
     $('#bar').style.width = '100%'; $('#vmodal').classList.add('hidden'); loadAll();
@@ -332,29 +345,57 @@ function diff(r) {
   return `<div class="overflow-x-auto"><table class="w-full text-xs mt-2"><thead class="text-on-surface-variant"><tr><th class="text-left p-1.5">Field</th>${r.action === 'update' ? '<th class="text-left p-1.5">Current</th>' : ''}<th class="text-left p-1.5">${r.action === 'update' ? 'Proposed' : 'Value'}</th></tr></thead><tbody>
     ${rows.map(k => `<tr class="border-t border-outline-variant/30"><td class="p-1.5 font-medium">${k}</td>${r.action === 'update' ? `<td class="p-1.5 text-on-surface-variant line-through break-all">${esc(fmt(cur?.[k]))}</td>` : ''}<td class="p-1.5 text-green-800 break-all">${esc(fmt(p[k]))}</td></tr>`).join('')}</tbody></table></div>`;
 }
+const ago = d => { const s = (Date.now() - new Date(d)) / 1000; return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + 'm ago' : s < 86400 ? Math.floor(s / 3600) + 'h ago' : s < 604800 ? Math.floor(s / 86400) + 'd ago' : new Date(d).toLocaleDateString(); };
+const initials = e => (e || '?').split('@')[0].split(/[._-]/).map(x => x[0]).join('').slice(0, 2).toUpperCase();
 function reqCard(r, forReview) {
   const chip = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800' }[r.status];
-  return `<div class="bg-white rounded-xl border border-outline-variant/40 p-4"><div class="flex flex-wrap items-center gap-2"><span class="material-symbols-outlined text-primary">${r.entity === 'video' ? 'movie' : 'category'}</span><p class="font-semibold flex-1 min-w-[200px]">${esc(r.summary || `${r.action} ${r.entity}`)}</p><span class="text-xs font-semibold px-2.5 py-1 rounded-full ${chip}">${r.status}</span></div>
-  <p class="text-xs text-on-surface-variant mt-1">${esc(r.requested_email || who(r.requested_by))} · ${new Date(r.created_at).toLocaleString()}${r.review_note ? ` · Note: “${esc(r.review_note)}”` : ''}</p>
-  ${r.status === 'pending' ? diff(r) : ''}
-  ${forReview && r.status === 'pending' ? `<div class="flex gap-2 mt-3"><button data-rok="${r.id}" class="px-3 py-1.5 rounded-lg bg-green-700 text-white text-sm font-semibold">Approve</button><button data-rno="${r.id}" class="px-3 py-1.5 rounded-lg border border-outline-variant text-sm">Reject</button></div>` : ''}
-  ${!forReview && r.status === 'pending' ? `<button data-rcancel="${r.id}" class="mt-3 text-sm text-error font-medium">Cancel request</button>` : ''}</div>`;
+  const act = { insert: ['add_circle', 'text-green-700'], update: ['edit', 'text-primary'], delete: ['delete', 'text-error'] }[r.action] || ['edit', 'text-primary'];
+  return `<div class="bg-white rounded-2xl border border-outline-variant/40 p-5"><div class="flex flex-wrap items-center gap-3">
+  <span class="w-10 h-10 rounded-full bg-surface-container grid place-items-center ${act[1]}"><span class="material-symbols-outlined">${act[0]}</span></span>
+  <div class="flex-1 min-w-[200px]"><p class="font-semibold">${esc(r.summary || `${r.action} ${r.entity}`)}</p><p class="text-xs text-on-surface-variant">${esc(r.requested_email || who(r.requested_by))} · ${ago(r.created_at)}</p></div>
+  <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${chip}">${r.status}</span></div>
+  ${r.status === 'pending' ? `<div class="mt-3 rounded-xl bg-surface-container-low p-3">${diff(r)}</div>` : ''}${r.review_note ? `<p class="text-sm mt-2 text-on-surface-variant">Note: “${esc(r.review_note)}”</p>` : ''}
+  ${forReview && r.status === 'pending' ? `<div class="flex gap-2 mt-4 justify-end"><button data-rno="${r.id}" class="px-4 py-2 rounded-lg border border-outline-variant text-sm font-medium hover:border-red-400 hover:text-red-700">Reject</button><button data-rok="${r.id}" class="px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800">Approve &amp; apply</button></div>` : ''}</div>`;
 }
+let rvSel = null, rvTab = 'videos';
+function setRvTab(t) { rvTab = t; $$('#rvTabs .rt').forEach(b => { const on = b.dataset.rt === t; b.classList.toggle('bg-primary', on); b.classList.toggle('text-on-primary', on); b.classList.toggle('text-on-surface-variant', !on); });
+  ['videos', 'changes', 'history'].forEach(k => $('#rp-' + k).classList.toggle('hidden', k !== t)); }
+$$('#rvTabs .rt').forEach(b => b.onclick = () => setRvTab(b.dataset.rt));
 function renderReview() {
   if (!isSuper()) return;
-  const pv = videos.filter(v => v.status === 'pending'), pr = reqs.filter(r => r.status === 'pending');
-  $('#rvCount').textContent = `(${pv.length})`; $('#rcCount').textContent = `(${pr.length})`;
-  $('#rvList').innerHTML = pv.map(v => `<div class="bg-white rounded-xl border border-outline-variant/40 overflow-hidden">
-    <div class="aspect-video bg-black">${v.video_url ? `<video src="${esc(v.video_url)}" poster="${esc(v.thumbnail_url || '')}" controls preload="none" class="w-full h-full object-contain"></video>` : ''}</div>
-    <div class="p-4"><p class="font-semibold">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${esc(cname(v.category))} › ${esc(cname(v.subcategory))} · ${esc(v.resolution)} · ${dur(v.duration_seconds)} · by ${esc(who(v.submitted_by))}</p>
-    ${v.description ? `<p class="text-sm mt-2">${esc(v.description)}</p>` : ''}${v.content ? `<p class="text-sm mt-2 text-on-surface-variant"><b>Content:</b> ${esc(v.content)}</p>` : ''}
-    <div class="flex flex-wrap gap-1 mt-2">${(v.tags || []).map(t => `<span class="text-[11px] px-2 py-0.5 rounded-full bg-surface-container">#${esc(t)}</span>`).join('')}</div>
-    <div class="flex gap-2 mt-4"><button data-vok="${v.id}" class="px-3 py-1.5 rounded-lg bg-green-700 text-white text-sm font-semibold">Approve &amp; publish</button><button data-vno="${v.id}" class="px-3 py-1.5 rounded-lg border border-outline-variant text-sm">Reject</button><button data-vedit="${v.id}" class="px-3 py-1.5 rounded-lg text-sm text-primary font-medium">Edit first</button></div></div></div>`).join('') || '<p class="text-on-surface-variant text-sm">Nothing waiting. 🎉</p>';
-  $('#rcList').innerHTML = pr.map(r => reqCard(r, true)).join('') || '<p class="text-on-surface-variant text-sm">No pending changes.</p>';
-  $('#rcDone').innerHTML = reqs.filter(r => r.status !== 'pending').slice(0, 10).map(r => reqCard(r, false)).join('') || '<p class="text-on-surface-variant text-sm">—</p>';
+  const pv = videos.filter(v => v.status === 'pending').sort((a, b) => a.created_at.localeCompare(b.created_at)), pr = reqs.filter(r => r.status === 'pending');
+  const cnt = (el, n) => { el.textContent = n; el.className = 'ml-1 text-xs rounded-full px-1.5 py-0.5 ' + (n ? 'bg-error text-white' : 'bg-surface-container text-on-surface-variant'); };
+  cnt($('#rvCount'), pv.length); cnt($('#rcCount'), pr.length); setRvTab(rvTab);
+  const today = videos.filter(v => v.reviewed_by && v.status !== 'pending' && Date.now() - new Date(v.created_at) < 864e5).length;
+  $('#rvPills').innerHTML = [['hourglass_top', pv.length + ' waiting', 'bg-amber-100 text-amber-800'], ['check_circle', videos.filter(isLive).length + ' live', 'bg-green-100 text-green-800'], ['block', videos.filter(v => v.status === 'rejected').length + ' rejected', 'bg-red-100 text-red-800']]
+    .map(([i, t, c]) => `<span class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full ${c}"><span class="material-symbols-outlined !text-sm">${i}</span>${t}</span>`).join('');
+  $('#rvWrap').classList.toggle('hidden', !pv.length); $('#rvEmpty').classList.toggle('hidden', !!pv.length);
+  if (!pv.find(v => v.id === rvSel)) rvSel = pv[0]?.id;
+  $('#rvList').innerHTML = pv.map(v => `<button data-sel="${v.id}" class="w-full text-left flex gap-3 p-2.5 rounded-xl border transition ${v.id === rvSel ? 'border-primary bg-primary-fixed/40' : 'border-outline-variant/40 bg-white hover:border-primary/40'}">
+    <div class="w-24 aspect-video rounded-lg bg-surface-container overflow-hidden shrink-0 relative">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}<span class="absolute bottom-1 right-1 text-[10px] bg-black/70 text-white px-1 rounded">${dur(v.duration_seconds)}</span></div>
+    <div class="min-w-0"><p class="text-sm font-semibold line-clamp-2">${esc(v.title)}</p><p class="text-xs text-on-surface-variant mt-0.5 truncate">${esc(who(v.submitted_by))}</p><p class="text-[11px] text-on-surface-variant">${ago(v.created_at)}</p></div></button>`).join('');
+  const v = pv.find(x => x.id === rvSel);
+  $('#rvDetail').innerHTML = v ? `<div class="bg-white rounded-2xl border border-outline-variant/40 overflow-hidden">
+    <div class="aspect-video bg-black">${v.video_url ? `<video src="${esc(v.video_url)}" poster="${esc(v.thumbnail_url || '')}" controls preload="metadata" class="w-full h-full object-contain"></video>` : ''}</div>
+    <div class="p-5"><div class="flex flex-wrap items-start gap-3"><div class="flex-1 min-w-0"><h2 class="text-xl font-bold">${esc(v.title)}</h2><p class="text-sm text-on-surface-variant">${esc(cname(v.category))} › ${esc(cname(v.subcategory))}</p></div>
+    <div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full bg-primary-fixed text-primary text-xs font-bold grid place-items-center">${initials(who(v.submitted_by))}</span><div class="text-xs"><p class="font-medium">${esc(who(v.submitted_by))}</p><p class="text-on-surface-variant">${new Date(v.created_at).toLocaleString()}</p></div></div></div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">${[['Resolution', v.resolution], ['Frame rate', v.fps + ' fps'], ['Duration', dur(v.duration_seconds)], ['Orientation', v.orientation]].map(([k, x]) => `<div class="rounded-lg bg-surface-container-low p-2.5"><p class="text-[11px] text-on-surface-variant">${k}</p><p class="text-sm font-semibold capitalize">${esc(x)}</p></div>`).join('')}</div>
+    ${v.description ? `<p class="text-sm mt-4">${esc(v.description)}</p>` : '<p class="text-sm mt-4 text-on-surface-variant italic">No description.</p>'}
+    <div class="flex flex-wrap gap-1.5 mt-3">${(v.tags || []).map(t => `<span class="text-xs px-2 py-0.5 rounded-full bg-surface-container">#${esc(t)}</span>`).join('') || '<span class="text-xs text-on-surface-variant italic">No tags</span>'}</div>
+    <div class="flex flex-wrap gap-2 mt-6 pt-4 border-t border-outline-variant/40"><button data-vedit="${v.id}" class="px-4 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary-fixed/50 flex items-center gap-1"><span class="material-symbols-outlined !text-lg">edit</span>Edit first</button><span class="flex-1"></span>
+    <button data-vno="${v.id}" class="px-4 py-2.5 rounded-lg border border-outline-variant text-sm font-medium hover:border-red-400 hover:text-red-700 flex items-center gap-1"><span class="material-symbols-outlined !text-lg">block</span>Reject</button>
+    <button data-vok="${v.id}" class="px-5 py-2.5 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 flex items-center gap-1"><span class="material-symbols-outlined !text-lg">check</span>Approve &amp; publish</button></div></div></div>` : '';
+  $('#rcList').innerHTML = pr.map(r => reqCard(r, true)).join('') || '<div class="text-center py-16 bg-white rounded-2xl border border-outline-variant/40 text-on-surface-variant"><span class="material-symbols-outlined !text-5xl">inbox</span><p class="mt-2">No pending change requests.</p></div>';
+  const hist = [...videos.filter(x => x.status !== 'pending' && x.reviewed_by).map(x => ({ t: x.title, by: who(x.submitted_by), st: x.status, note: x.review_note, at: x.created_at, k: 'movie' })),
+    ...reqs.filter(r => r.status !== 'pending').map(r => ({ t: r.summary, by: r.requested_email || who(r.requested_by), st: r.status, note: r.review_note, at: r.reviewed_at || r.created_at, k: 'edit_note' }))].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 40);
+  $('#rcDone').innerHTML = hist.map(h => `<tr class="border-b border-outline-variant/30 last:border-0"><td class="p-3"><span class="inline-flex items-center gap-2"><span class="material-symbols-outlined text-on-surface-variant !text-lg">${h.k}</span>${esc(h.t)}</span></td><td class="p-3 text-on-surface-variant">${esc(h.by)}</td>
+    <td class="p-3"><span class="text-xs font-semibold px-2.5 py-1 rounded-full ${h.st === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${h.st}</span></td><td class="p-3 text-on-surface-variant max-w-[260px] truncate">${esc(h.note || '—')}</td><td class="p-3 text-on-surface-variant whitespace-nowrap">${ago(h.at)}</td></tr>`).join('') || '<tr><td colspan="5" class="p-6 text-center text-on-surface-variant">Nothing reviewed yet.</td></tr>';
 }
 $('#t-review').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.sel) { rvSel = d.sel; return renderReview(); }
+  if (b.id === 'approveAll') { const pv = videos.filter(v => v.status === 'pending'); if (!pv.length || !confirm(`Approve and publish all ${pv.length} videos?`)) return;
+    const { error } = await sb.from('videos').update({ status: 'approved', published: true, reviewed_by: me.id, review_note: null }).in('id', pv.map(v => v.id)); if (error) return toast(error.message, 1); toast(`${pv.length} videos approved`); return loadAll(); }
   if (d.vok || d.vno) return reviewVideo(videos.find(v => v.id === (d.vok || d.vno)), !!d.vok);
   if (d.vedit) return openVideo(videos.find(v => v.id === d.vedit));
   if (d.rok || d.rno) {
@@ -431,29 +472,41 @@ $('#cform').onsubmit = async e => {
 // ---------------- TEAM (superadmin) ----------------
 function renderTeam() {
   if (!isSuper()) return;
-  $('#teamRows').innerHTML = team.map(t => `<tr class="border-b border-outline-variant/30 last:border-0"><td class="p-3">${esc(t.email || t.user_id)}${t.user_id === me.id ? ' <span class="text-xs text-on-surface-variant">(you)</span>' : ''}</td>
-    <td class="p-3"><select data-role="${t.user_id}" ${t.user_id === me.id ? 'disabled' : ''} class="rounded-lg border-outline-variant text-sm py-1.5"><option value="admin" ${t.role === 'admin' ? 'selected' : ''}>Admin</option><option value="superadmin" ${t.role === 'superadmin' ? 'selected' : ''}>Superadmin</option></select></td>
-    <td class="p-3 text-right">${t.user_id === me.id ? '' : `<button data-rm="${t.user_id}" class="text-sm text-error font-medium">Remove</button>`}</td></tr>`).join('');
+  const st = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${i}</span></span><div><p class="text-2xl font-bold leading-none">${n}</p><p class="text-xs text-on-surface-variant mt-1">${l}</p></div></div>`;
+  $('#teamStats').innerHTML = st('groups', team.length, 'Members') + st('shield_person', team.filter(t => t.role === 'superadmin').length, 'Superadmins') + st('person', team.filter(t => t.role === 'admin').length, 'Admins') + st('mail', invites.length, 'Pending invites');
+  const sorted = [...team].sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || (a.role === b.role ? 0 : a.role === 'superadmin' ? -1 : 1));
+  $('#teamRows').innerHTML = sorted.map(t => { const up = videos.filter(v => v.submitted_by === t.user_id), you = t.user_id === me.id, sup = t.role === 'superadmin';
+    return `<div class="bg-white rounded-2xl border border-outline-variant/40 p-4">
+    <div class="flex items-center gap-3"><span class="w-11 h-11 rounded-full grid place-items-center font-bold text-sm ${sup ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface'}">${initials(t.email)}</span>
+    <div class="flex-1 min-w-0"><p class="font-semibold truncate">${esc(t.email || t.user_id)}</p><p class="text-xs text-on-surface-variant">${you ? 'You · ' : ''}${up.length} uploads · ${up.filter(isLive).length} live</p></div>
+    <span class="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${sup ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-surface-container text-on-surface-variant'}">${sup ? 'Superadmin' : 'Admin'}</span></div>
+    ${you ? '' : `<div class="flex items-center gap-2 mt-4 pt-3 border-t border-outline-variant/40"><select data-role="${t.user_id}" aria-label="Role" class="flex-1 rounded-lg border-outline-variant text-sm py-1.5 focus:ring-primary"><option value="admin" ${!sup ? 'selected' : ''}>Admin</option><option value="superadmin" ${sup ? 'selected' : ''}>Superadmin</option></select>
+    <button data-rm="${t.user_id}" data-em="${esc(t.email)}" class="px-3 py-1.5 rounded-lg text-sm text-error font-medium hover:bg-red-50 flex items-center gap-1"><span class="material-symbols-outlined !text-base">person_remove</span>Remove</button></div>`}</div>`; }).join('');
 }
 $('#teamRows').onchange = async e => { const id = e.target.dataset.role; if (!id) return; const { error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id); if (error) return toast(error.message, 1); toast('Role updated'); loadAll(); };
-$('#teamRows').onclick = async e => { const id = e.target.dataset.rm; if (!id || !confirm('Remove admin access for this user?')) return; const { error } = await sb.from('admins').delete().eq('user_id', id); if (error) return toast(error.message, 1); toast('Removed'); loadAll(); };
-$('#addAdmin').onsubmit = async e => {
-  e.preventDefault(); const f = e.target, b = f.querySelector('button'), lbl = b.innerHTML; b.disabled = true; b.textContent = 'Sending…';
-  const { data, error } = await sb.functions.invoke('invite-admin', { body: { email: f.email.value.trim(), role: f.role.value, redirectTo: ADMIN_URL } });
-  b.disabled = false; b.innerHTML = lbl;
+$('#teamRows').onclick = async e => { const b = e.target.closest('[data-rm]'); if (!b || !confirm(`Remove admin access for ${b.dataset.em}?`)) return; const { error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm); if (error) return toast(error.message, 1); toast('Removed'); loadAll(); };
+async function sendInvite(email, role) {
+  const { data, error } = await sb.functions.invoke('invite-admin', { body: { email, role, redirectTo: ADMIN_URL } });
   let msg = error?.message; if (error && error.context?.json) { try { msg = (await error.context.json()).error || msg; } catch { } }
   if (error) {
-    if (/Failed to send|not found|404|FunctionsFetchError|FunctionsRelayError/i.test(msg || '')) {  // function not deployed → fallback
-      const r = await sb.rpc('add_admin', { p_email: f.email.value.trim(), p_role: f.role.value });
-      if (r.error) return toast(r.error.message, 1);
-      toast(r.data === 'invited' ? 'Role saved. Invite function not deployed — send invite from Supabase → Users → Invite user' : 'Admin added'); f.reset(); return loadAll();
+    if (/Failed to send|not found|404|FunctionsFetchError|FunctionsRelayError/i.test(msg || '')) {
+      const r = await sb.rpc('add_admin', { p_email: email, p_role: role }); if (r.error) { toast(r.error.message, 1); return false; }
+      toast(r.data === 'invited' ? 'Role saved. Invite function not deployed — send invite from Supabase → Users → Invite user' : 'Admin added'); return true;
     }
-    return toast(msg, 1);
+    toast(msg, 1); return false;
   }
-  toast(data?.status === 'sent' ? 'Invite email sent to ' + f.email.value.trim() : (data?.note || 'Done')); f.reset(); loadAll();
+  toast(data?.status === 'sent' ? 'Invite email sent to ' + email : (data?.note || 'Done')); return true;
+}
+$('#addAdmin').onsubmit = async e => {
+  e.preventDefault(); const f = e.target, b = f.querySelector('button'), lbl = b.innerHTML; b.disabled = true; b.textContent = 'Sending…';
+  const ok = await sendInvite(f.email.value.trim(), f.role.value); b.disabled = false; b.innerHTML = lbl; if (ok) { f.reset(); loadAll(); }
 };
 function renderInvites() { const el = $('#inviteRows'); if (!el) return;
-  el.innerHTML = invites.map(i => `<div class="bg-white rounded-xl border border-outline-variant/40 p-3 flex items-center gap-3 text-sm"><span class="material-symbols-outlined text-primary">mail</span><span class="flex-1">${esc(i.email)} <span class="text-xs text-on-surface-variant">· ${esc(i.role)}</span></span><button data-uninv="${esc(i.email)}" class="text-error font-medium">Cancel</button></div>`).join('') || '<p class="text-sm text-on-surface-variant">No pending invites.</p>'; }
-$('#inviteRows').onclick = async e => { const em = e.target.dataset.uninv; if (!em) return; const { error } = await sb.from('admin_invites').delete().eq('email', em); if (error) return toast(error.message, 1); loadAll(); };
+  el.innerHTML = invites.map(i => `<div class="bg-white rounded-xl border border-dashed border-outline-variant p-3 flex flex-wrap items-center gap-3 text-sm"><span class="w-9 h-9 rounded-full bg-amber-100 text-amber-800 grid place-items-center"><span class="material-symbols-outlined !text-lg">schedule_send</span></span>
+    <div class="flex-1 min-w-0"><p class="font-medium truncate">${esc(i.email)}</p><p class="text-xs text-on-surface-variant capitalize">${esc(i.role)} · invited ${ago(i.created_at)}</p></div>
+    <button data-resend="${esc(i.email)}" data-role="${esc(i.role)}" class="px-3 py-1.5 rounded-lg text-primary font-medium hover:bg-primary-fixed/50">Resend</button><button data-uninv="${esc(i.email)}" class="px-3 py-1.5 rounded-lg text-error font-medium hover:bg-red-50">Cancel</button></div>`).join('') || '<p class="text-sm text-on-surface-variant bg-white rounded-xl border border-outline-variant/40 p-4">No pending invites.</p>'; }
+$('#inviteRows').onclick = async e => { const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.resend) { b.disabled = true; await sendInvite(b.dataset.resend, b.dataset.role); b.disabled = false; return; }
+  const em = b.dataset.uninv; if (!em || !confirm(`Cancel invite for ${em}?`)) return; const { error } = await sb.from('admin_invites').delete().eq('email', em); if (error) return toast(error.message, 1); loadAll(); };
 
 boot();

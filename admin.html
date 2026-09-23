@@ -12,13 +12,22 @@
 <div class="flex-1 p-8"><div class="sk h-8 w-48 mb-6"></div><div class="grid gap-4 grid-cols-2 lg:grid-cols-4"><div class="sk h-28"></div><div class="sk h-28"></div><div class="sk h-28"></div><div class="sk h-28"></div></div></div></div>
 
 <!-- LOGIN -->
-<div id="login" style="display:none" class="min-h-screen flex items-center justify-center px-4 bg-surface-container-low">
-<form id="loginForm" class="w-full max-w-sm bg-white border border-outline-variant/50 rounded-2xl p-8 shadow-xl">
-<img src="logo.png" width="56" height="56" class="h-14 w-14 rounded-xl mx-auto mb-4" alt=""><h1 class="text-2xl font-bold text-center mb-1">Admin Login</h1><p class="text-sm text-center text-on-surface-variant mb-6">Edit Simple Libraries</p>
-<label class="text-sm font-medium">Email</label><input name="email" type="email" autocomplete="username" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4">
-<label class="text-sm font-medium">Password</label><input name="password" type="password" autocomplete="current-password" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-6">
-<button class="w-full bg-primary text-on-primary rounded-lg py-3 font-semibold hover:brightness-95">Log in</button><p id="loginErr" class="text-sm text-error mt-3 text-center"></p>
-<button type="button" id="forgotBtn" class="block mx-auto mt-2 text-sm text-primary font-medium">Forgot password?</button></form></div>
+<div id="login" style="display:none" class="login-bg relative min-h-screen flex items-center justify-center px-4 overflow-hidden">
+<span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+<div class="relative w-full max-w-sm">
+<form id="loginForm" class="login-card bg-white/90 backdrop-blur border border-white rounded-3xl p-8 shadow-2xl">
+<div class="text-center mb-6"><img src="logo.png" width="64" height="64" class="logo-float h-16 w-16 rounded-2xl mx-auto mb-4 shadow-lg" alt=""><h1 class="text-2xl font-bold">Welcome back</h1><p class="text-sm text-on-surface-variant">Sign in to Edit Simple Libraries admin</p></div>
+<div class="stagger"><label class="text-sm font-medium">Email</label>
+<div class="relative mt-1 mb-4"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">mail</span><input name="email" type="email" autocomplete="username" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10"></div></div>
+<div class="stagger"><label class="text-sm font-medium">Password</label>
+<div class="relative mt-1 mb-6"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">lock</span><input name="password" type="password" autocomplete="current-password" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10 pr-10"><button type="button" id="pwEye" class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl" aria-label="Show password">visibility</button></div></div>
+<div class="stagger"><button id="loginBtn" class="relative w-full bg-primary text-on-primary rounded-xl py-3 font-semibold hover:brightness-95 active:scale-[.98] transition overflow-hidden"><span class="lbl">Log in</span><span class="spin hidden absolute inset-0 grid place-items-center"><span class="spinner"></span></span></button>
+<p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]"></p>
+<button type="button" id="forgotBtn" class="block mx-auto text-sm text-primary font-medium hover:underline">Forgot password?</button></div></form>
+<div id="loginOk" class="hidden login-card bg-white/90 backdrop-blur rounded-3xl p-10 shadow-2xl text-center">
+<svg class="check mx-auto" viewBox="0 0 52 52" width="72" height="72"><circle cx="26" cy="26" r="24" fill="none" stroke="#16a34a" stroke-width="3"/><path fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27l7 7 15-15"/></svg>
+<p class="text-xl font-bold mt-4">Signed in</p><p class="text-sm text-on-surface-variant">Loading your dashboard…</p></div>
+<a href="index.html" class="block text-center text-sm text-on-surface-variant mt-6 hover:text-primary">← Back to website</a></div></div>
 
 <!-- SET PASSWORD (invite / reset / first login) -->
 <div id="setpw" style="display:none" class="min-h-screen flex items-center justify-center px-4 bg-surface-container-low">
@@ -54,13 +63,21 @@
 <button id="newVideo" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add video</button></div>
 <div class="flex flex-wrap gap-2 mb-4"><input id="vq" type="search" placeholder="Search title, content, tags…" class="rounded-lg border-outline-variant flex-1 min-w-[180px] focus:ring-primary"><select id="vcat" class="rounded-lg border-outline-variant focus:ring-primary"></select>
 <select id="vstat" class="rounded-lg border-outline-variant focus:ring-primary"><option value="">All status</option><option value="live">Live</option><option value="hidden">Hidden</option><option value="pending">Pending review</option><option value="rejected">Rejected</option><option value="mine">My uploads</option></select></div>
-<div class="overflow-x-auto bg-white rounded-xl border border-outline-variant/40"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Video</th><th class="p-3">Category</th><th class="p-3">Specs</th><th class="p-3">Status</th><th class="p-3 text-right">Actions</th></tr></thead><tbody id="vrows"></tbody></table></div>
+<div class="overflow-x-auto bg-white rounded-xl border border-outline-variant/40"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Video</th><th class="p-3">Category</th><th class="p-3">Specs</th><th class="p-3">Status</th><th id="vActTh" class="p-3 text-right">Actions</th></tr></thead><tbody id="vrows"></tbody></table></div>
 <p id="vempty" class="hidden text-center text-on-surface-variant py-12">No videos match.</p></section>
 
-<section id="t-review" class="hidden"><h1 class="text-2xl font-bold mb-1">Review queue</h1><p class="text-on-surface-variant mb-6">Approve or reject work submitted by admins.</p>
-<h2 class="font-semibold mb-3">Pending videos <span id="rvCount" class="text-on-surface-variant font-normal"></span></h2><div id="rvList" class="grid gap-4 lg:grid-cols-2"></div>
-<h2 class="font-semibold mt-10 mb-3">Pending changes <span id="rcCount" class="text-on-surface-variant font-normal"></span></h2><div id="rcList" class="space-y-3"></div>
-<h2 class="font-semibold mt-10 mb-3">Recently reviewed</h2><div id="rcDone" class="space-y-2"></div></section>
+<section id="t-review" class="hidden">
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6"><div><h1 class="text-2xl font-bold">Review</h1><p class="text-on-surface-variant">Approve or reject what admins submitted.</p></div>
+<div id="rvPills" class="flex flex-wrap gap-2"></div></div>
+<div class="inline-flex bg-white border border-outline-variant/50 rounded-xl p-1 mb-6" role="tablist" id="rvTabs">
+<button data-rt="videos" class="rt px-4 py-2 rounded-lg text-sm font-semibold">Videos <span id="rvCount" class="ml-1 text-xs rounded-full px-1.5 py-0.5"></span></button>
+<button data-rt="changes" class="rt px-4 py-2 rounded-lg text-sm font-semibold">Changes <span id="rcCount" class="ml-1 text-xs rounded-full px-1.5 py-0.5"></span></button>
+<button data-rt="history" class="rt px-4 py-2 rounded-lg text-sm font-semibold">History</button></div>
+<div id="rp-videos"><div id="rvWrap" class="grid gap-6 lg:grid-cols-[340px_1fr]"><div><div class="flex items-center justify-between mb-2"><p class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Queue</p><button id="approveAll" class="text-xs font-semibold text-green-700 hover:underline">Approve all</button></div><div id="rvList" class="space-y-2 lg:max-h-[70vh] lg:overflow-y-auto pr-1"></div></div><div id="rvDetail"></div></div>
+<div id="rvEmpty" class="hidden text-center py-20 bg-white rounded-2xl border border-outline-variant/40"><span class="material-symbols-outlined !text-6xl text-green-600">task_alt</span><p class="text-lg font-semibold mt-2">All caught up!</p><p class="text-sm text-on-surface-variant">No videos are waiting for review.</p></div></div>
+<div id="rp-changes" class="hidden"><div id="rcList" class="space-y-3"></div></div>
+<div id="rp-history" class="hidden"><div class="bg-white rounded-xl border border-outline-variant/40 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Item</th><th class="p-3">Submitted by</th><th class="p-3">Decision</th><th class="p-3">Note</th><th class="p-3">When</th></tr></thead><tbody id="rcDone"></tbody></table></div></div>
+</section>
 
 <section id="t-requests" class="hidden"><h1 class="text-2xl font-bold mb-1">My requests</h1><p class="text-on-surface-variant mb-6">Your uploads and changes waiting for superadmin approval.</p><div id="myReq" class="space-y-3"></div></section>
 
@@ -68,11 +85,20 @@
 <button id="newCat" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add category</button></div>
 <p id="catHint" class="text-sm text-on-surface-variant mb-6"></p><div id="catList" class="grid gap-4 md:grid-cols-3"></div></section>
 
-<section id="t-team" class="hidden"><h1 class="text-2xl font-bold mb-6">Team</h1>
-<form id="addAdmin" class="bg-white rounded-xl border border-outline-variant/40 p-4 flex flex-wrap gap-2 items-end mb-6"><div class="flex-1 min-w-[220px]"><label class="text-sm font-medium">Email</label><input name="email" type="email" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></div>
-<div><label class="text-sm font-medium">Role</label><select name="role" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><option value="admin">Admin</option><option value="superadmin">Superadmin</option></select></div><button class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2"><span class="material-symbols-outlined !text-lg">send</span>Send invite</button>
-<p class="w-full text-xs text-on-surface-variant">Sends an invite email. They click it, create a password and get this role. Existing users get the role immediately.</p></form>
-<div class="bg-white rounded-xl border border-outline-variant/40 overflow-hidden"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Email</th><th class="p-3">Role</th><th class="p-3 text-right">Actions</th></tr></thead><tbody id="teamRows"></tbody></table></div><h2 class="font-semibold mt-8 mb-3">Invited — not accepted yet</h2><div id="inviteRows" class="space-y-2"></div></section>
+<section id="t-team" class="hidden">
+<div class="mb-6"><h1 class="text-2xl font-bold">Team</h1><p class="text-on-surface-variant">Invite people and manage who can do what.</p></div>
+<div id="teamStats" class="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6"></div>
+<div class="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
+<div><h2 class="font-semibold mb-3">Members</h2><div id="teamRows" class="grid gap-3 2xl:grid-cols-2"></div>
+<h2 class="font-semibold mt-8 mb-3">Pending invites</h2><div id="inviteRows" class="space-y-2"></div></div>
+<form id="addAdmin" class="bg-white rounded-2xl border border-outline-variant/40 p-5 lg:sticky lg:top-6">
+<div class="flex items-center gap-3 mb-4"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">person_add</span></span><div><p class="font-semibold">Invite a member</p><p class="text-xs text-on-surface-variant">They'll get an email to set a password.</p></div></div>
+<label class="text-sm font-medium">Email</label><input name="email" type="email" required placeholder="name@example.com" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4">
+<p class="text-sm font-medium mb-2">Role</p>
+<label class="flex gap-3 p-3 rounded-xl border border-outline-variant/60 mb-2 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary-fixed/40"><input type="radio" name="role" value="admin" checked class="mt-1 text-primary focus:ring-primary"><span><span class="block text-sm font-semibold">Admin</span><span class="block text-xs text-on-surface-variant">Uploads videos. Everything needs your approval.</span></span></label>
+<label class="flex gap-3 p-3 rounded-xl border border-outline-variant/60 mb-4 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary-fixed/40"><input type="radio" name="role" value="superadmin" class="mt-1 text-primary focus:ring-primary"><span><span class="block text-sm font-semibold">Superadmin</span><span class="block text-xs text-on-surface-variant">Full control: publish, review, categories, team.</span></span></label>
+<button class="w-full bg-primary text-on-primary rounded-lg py-2.5 font-semibold flex items-center justify-center gap-2 hover:brightness-95"><span class="material-symbols-outlined !text-lg">send</span>Send invite</button></form>
+</div></section>
 </main></div>
 
 <!-- VIDEO MODAL -->
