@@ -36,7 +36,7 @@ const catSkel=`<div class="rounded-3xl bg-surface-container-lowest border border
 cats.innerHTML=catSkel.repeat(3);
 f.onsubmit=e=>{e.preventDefault();const p=new URLSearchParams();if(f.cat.value)p.set('cat',f.cat.value);if(f.q.value.trim())p.set('q',f.q.value.trim());location.href='videos.html?'+p};
 document.getElementById('trending').innerHTML='<span class="text-on-surface-variant py-1">Popular:</span>'+['Courtroom','Consultation','Hospital','Surgery','Handshake','Testimonials'].map(t=>`<a href="videos.html?q=${t}" class="px-3 py-1 rounded-full bg-surface-container-low border border-outline-variant/60 hover:border-primary hover:text-primary">${t}</a>`).join('');
-ES.ready.then(async()=>{
+const render=async()=>{
  f.cat.innerHTML='<option value="">All categories</option>'+ES.CATS.map(c=>`<option value="${c.slug}">${esEsc(c.name)}</option>`).join('');
  const [n,vids]=await Promise.all([ES.counts(),ES.listVideos({limit:6})]);
  cats.innerHTML=ES.CATS.map(c=>`<div class="rounded-3xl bg-surface-container-lowest border border-outline-variant/40 p-6 hover:shadow-xl hover:border-primary/40 transition">
@@ -44,6 +44,7 @@ ES.ready.then(async()=>{
  <a href="videos.html?cat=${c.slug}"><h3 class="text-xl font-bold hover:text-primary">${esEsc(c.name)}</h3></a><p class="text-sm text-on-surface-variant mt-1 mb-4">${esEsc(c.blurb)}</p>
  <div class="flex flex-wrap gap-2">${c.subs.map(([s,nm])=>`<a href="videos.html?cat=${c.slug}&sub=${s}" class="text-xs px-3 py-1.5 rounded-full bg-surface-container hover:bg-primary hover:text-on-primary transition">${esEsc(nm)}</a>`).join('')}</div></div>`).join('');
  latest.innerHTML=vids.length?vids.map(esCard).join(''):'<p class="col-span-full text-center text-on-surface-variant py-12">New videos coming soon.</p>';esHoverPlay(latest);
-});
+};
+ES.ready.then(render);ES.onChange(render);
 })();
 </script></body></html>

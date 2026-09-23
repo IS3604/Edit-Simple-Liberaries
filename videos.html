@@ -37,8 +37,8 @@ function head(){const c=ES.cat(cat);
  const sn=sub&&c?ES.subName(cat,sub):'';document.getElementById('title').textContent=sn||(c?c.name:'All Videos');
  if(c)document.getElementById('blurb').textContent=c.blurb;document.title=(sn||c?.name||'All Videos')+' | Edit Simple Libraries';
  document.getElementById('crumbs').innerHTML='<a href="index.html" class="hover:text-primary">Home</a>'+(c?` <span>/</span> <a href="videos.html?cat=${cat}" class="hover:text-primary">${esEsc(c.name)}</a>`:' <span>/</span> Videos')+(sn?` <span>/</span> <span class="text-on-surface">${esEsc(sn)}</span>`:'');}
-async function load(){const my=++seq;grid.innerHTML=esSkel(6);document.getElementById('empty').classList.add('hidden');document.getElementById('count').textContent='';
- const q=qi.value.trim();const r=await ES.listVideos({category:cat||undefined,subcategory:sub||undefined,q:q||undefined});if(my!==seq)return;all=r;shown=PAGE;render();
+async function load(silent){const my=++seq;if(!silent){grid.innerHTML=esSkel(6);document.getElementById('empty').classList.add('hidden');document.getElementById('count').textContent=''}
+ const q=qi.value.trim();const r=await ES.listVideos({category:cat||undefined,subcategory:sub||undefined,q:q||undefined});if(my!==seq)return;all=r;if(!silent)shown=PAGE;render();
  const u=new URL(location);q?u.searchParams.set('q',q):u.searchParams.delete('q');history.replaceState(null,'',u);}
 function render(){const s=document.getElementById('sort').value,r=document.getElementById('res').value,o=document.getElementById('ori').value;
  let v=all.filter(x=>(!r||x.resolution===r)&&(!o||x.orientation===o));
@@ -48,6 +48,6 @@ function render(){const s=document.getElementById('sort').value,r=document.getEl
  document.getElementById('empty').classList.toggle('hidden',v.length>0);document.getElementById('more').classList.toggle('hidden',v.length<=shown);}
 let t;qi.oninput=()=>{clearTimeout(t);t=setTimeout(load,300)};['sort','res','ori'].forEach(id=>document.getElementById(id).onchange=render);
 document.getElementById('more').onclick=()=>{shown+=PAGE;render()};
-head();grid.innerHTML=esSkel(6);ES.ready.then(()=>{head();load()});
+head();grid.innerHTML=esSkel(6);ES.ready.then(()=>{head();load()});ES.onChange(()=>{head();load(true)});
 })();
 </script></body></html>

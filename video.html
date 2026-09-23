@@ -13,7 +13,7 @@
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6"><div class="sk h-16"></div><div class="sk h-16"></div><div class="sk h-16"></div><div class="sk h-16"></div></div></div><div class="lg:col-span-4"><div class="sk h-56 !rounded-2xl"></div></div></div></main>
 <script src="js/config.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
 <script>
-ES.ready.then(async()=>{const id=new URLSearchParams(location.search).get('id');const v=id&&await ES.getVideo(id);const root=document.getElementById('root');
+let first=true;const render=async()=>{const id=new URLSearchParams(location.search).get('id');const v=id&&await ES.getVideo(id);const root=document.getElementById('root');
 if(!v){root.innerHTML='<div class="text-center py-24"><h1 class="text-2xl font-bold">Video not found</h1><a href="videos.html" class="text-primary font-semibold mt-4 inline-block">Browse all videos</a></div>';return}
 const e=esEsc,c=ES.cat(v.category),sn=ES.subName(v.category,v.subcategory);document.title=v.title+' | Edit Simple Libraries';
 document.querySelector('meta[name=description]').content=(v.description||v.title).slice(0,155);
@@ -39,5 +39,6 @@ document.getElementById('dl').onclick=async e=>{if(!v.video_url)return esToast('
  catch{esToast('Could not download this file')}b.disabled=false;b.innerHTML=lbl};
 document.getElementById('share').onclick=()=>{navigator.clipboard?.writeText(location.href);esToast('Link copied')};
 let rel=(await ES.listVideos({category:v.category})).filter(x=>x.id!==v.id);rel.sort((a,b)=>(b.subcategory===v.subcategory)-(a.subcategory===v.subcategory));
-const r=document.getElementById('rel');r.innerHTML=rel.slice(0,3).map(esCard).join('')||'<p class="text-on-surface-variant">No related videos yet.</p>';esHoverPlay(r);});
+const r=document.getElementById('rel');r.innerHTML=rel.slice(0,3).map(esCard).join('')||'<p class="text-on-surface-variant">No related videos yet.</p>';esHoverPlay(r);first=false};
+ES.ready.then(render);ES.onChange(()=>{const vd=document.querySelector('#root video');if(vd&&!vd.paused)return;render()});
 </script></body></html>

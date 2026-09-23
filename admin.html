@@ -83,22 +83,28 @@
 <div class="grid gap-4 sm:grid-cols-2">
 <div class="sm:col-span-2"><label class="text-sm font-medium">Title *</label><input name="title" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></div>
 <div class="sm:col-span-2"><label class="text-sm font-medium">Short description</label><textarea name="description" rows="2" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></textarea></div>
-<div class="sm:col-span-2"><label class="text-sm font-medium">What's in the video (for search)</label><textarea name="content" rows="3" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary" placeholder="e.g. Female doctor in white coat explains X-ray to elderly patient in bright clinic room; close-up of hands pointing at screen."></textarea></div>
 <div><label class="text-sm font-medium">Category *</label><select name="category" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></select></div>
 <div><label class="text-sm font-medium">Subcategory *</label><select name="subcategory" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></select></div>
-<div class="sm:col-span-2 rounded-xl border-2 border-dashed border-outline-variant p-4"><label class="text-sm font-medium">Video file (.mp4 / .webm)</label><input type="file" name="vfile" accept="video/*" class="block w-full mt-2 text-sm">
-<p class="text-xs text-on-surface-variant mt-2">Duration, resolution &amp; orientation are detected automatically. A thumbnail is generated if you don't upload one.</p>
-<video id="vprev" class="hidden mt-3 w-full rounded-lg max-h-60 bg-black" controls muted></video>
-<label class="text-xs font-medium mt-3 block">…or video URL</label><input name="video_url" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary text-sm"></div>
-<div class="sm:col-span-2"><label class="text-sm font-medium">Thumbnail image (optional)</label><input type="file" name="tfile" accept="image/*" class="block w-full mt-2 text-sm"><img id="tprev" class="hidden mt-2 h-24 rounded-lg" alt=""><input name="thumbnail_url" type="hidden"></div>
-<div><label class="text-sm font-medium">Duration (sec)</label><input name="duration_seconds" type="number" min="0" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></div>
-<div><label class="text-sm font-medium">Resolution</label><select name="resolution" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><option>4K</option><option>1080p</option><option>720p</option></select></div>
-<div><label class="text-sm font-medium">FPS</label><select name="fps" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><option>24</option><option>25</option><option selected>30</option><option>50</option><option>60</option></select></div>
-<div><label class="text-sm font-medium">Orientation</label><select name="orientation" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><option>horizontal</option><option>vertical</option><option>square</option></select></div>
+<div class="sm:col-span-2 rounded-xl border-2 border-dashed border-outline-variant p-4"><label class="text-sm font-medium">Video file (.mp4 / .webm) *</label><input type="file" name="vfile" accept="video/*" class="block w-full mt-2 text-sm">
+<p id="vmeta" class="text-xs text-on-surface-variant mt-2">Duration, resolution, frame rate, orientation and thumbnail are detected automatically.</p>
+<video id="vprev" class="hidden mt-3 w-full rounded-lg max-h-60 bg-black" controls muted playsinline></video></div>
 <div class="sm:col-span-2"><label class="text-sm font-medium">Tags / keywords (comma separated)</label><input name="tags" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary" placeholder="court, judge, gavel"></div>
-<label class="sm:col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" name="published" class="rounded text-primary focus:ring-primary" checked> Visible on website (once approved)</label></div>
+<input type="hidden" name="duration_seconds"><input type="hidden" name="resolution"><input type="hidden" name="fps"><input type="hidden" name="orientation"></div>
 <div id="progress" class="hidden mt-4 text-sm text-on-surface-variant"><div class="h-2 bg-surface-container rounded-full overflow-hidden"><div id="bar" class="h-full bg-primary w-0 transition-all"></div></div><p id="ptext" class="mt-1"></p></div>
-<div class="flex justify-end gap-2 mt-6"><button type="button" data-close class="px-4 py-2.5 rounded-lg border border-outline-variant">Cancel</button><button id="vsave" class="px-5 py-2.5 rounded-lg bg-primary text-on-primary font-semibold">Save</button></div></form></div>
+<div id="vbtns" class="flex flex-wrap justify-end gap-2 mt-6"></div></form></div>
+
+<!-- REJECT MODAL -->
+<div id="rjmodal" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+<form id="rjform" class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+<div class="flex items-start gap-3 mb-4"><span class="w-10 h-10 shrink-0 rounded-full bg-red-100 text-red-700 grid place-items-center"><span class="material-symbols-outlined">block</span></span>
+<div class="flex-1 min-w-0"><h2 class="text-lg font-bold">Reject submission</h2><p id="rjwhat" class="text-sm text-on-surface-variant truncate"></p></div>
+<button type="button" data-close class="material-symbols-outlined" aria-label="Close">close</button></div>
+<label class="text-sm font-medium">Quick reasons</label>
+<div id="rjchips" class="flex flex-wrap gap-2 mt-2 mb-4"></div>
+<label class="text-sm font-medium">Message to the uploader *</label>
+<textarea name="note" rows="4" required maxlength="500" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary" placeholder="Explain what needs to change…"></textarea>
+<p class="text-xs text-on-surface-variant mt-1 mb-5">The uploader sees this in “My requests”.</p>
+<div class="flex justify-end gap-2"><button type="button" data-close class="px-4 py-2.5 rounded-lg border border-outline-variant">Cancel</button><button class="px-5 py-2.5 rounded-lg bg-red-700 text-white font-semibold">Reject</button></div></form></div>
 
 <!-- CATEGORY MODAL -->
 <div id="cmodal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

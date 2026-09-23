@@ -43,3 +43,4 @@ function openSearch(){if(document.getElementById('es-sov'))return;const m=docume
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch()}if(e.key==='Escape')document.getElementById('es-sov')?.remove()});
 header();footer();
 ES.ready.then(()=>{header();footer()});
+ES.onChange(()=>{header();footer()});

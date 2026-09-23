@@ -66,7 +66,18 @@ async function boot(skipLink) {
   $('#meRole').textContent = role; $('#meRole').className += isSuper() ? ' bg-primary text-on-primary' : ' bg-surface-container text-on-surface-variant';
   buildTabs(); show('app');
   paintSkeletons(); tab(location.hash.slice(1) || 'dash');
-  await loadAll();
+  await loadAll(); live();
+}
+// ---------------- LIVE UPDATES ----------------
+let liveCh = null, liveT = null;
+const refresh = () => { clearTimeout(liveT); liveT = setTimeout(loadAll, 400); };
+function live() {
+  if (liveCh) return;
+  liveCh = sb.channel('admin-live');
+  ['videos', 'categories', 'change_requests', 'admins', 'admin_invites'].forEach(t => liveCh.on('postgres_changes', { event: '*', schema: 'public', table: t }, refresh));
+  liveCh.subscribe();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  setInterval(() => { if (!document.hidden) refresh(); }, 60000);   // safety net
 }
 $('#loginForm').onsubmit = async e => {
   e.preventDefault(); $('#loginErr').textContent = ''; const b = e.target.querySelector('button'); b.disabled = true; b.textContent = 'Logging in…';
@@ -81,7 +92,7 @@ $('#logout').onclick = logout; $('#logoutM').onclick = logout;
 function buildTabs() {
   const t = [['dash', 'dashboard', 'Dashboard'], ['videos', 'movie', 'Videos'],
     isSuper() ? ['review', 'fact_check', 'Review'] : ['requests', 'pending_actions', 'My requests'],
-    ['cats', 'category', 'Categories'], ...(isSuper() ? [['team', 'group', 'Team']] : [])];
+    ...(isSuper() ? [['cats', 'category', 'Categories'], ['team', 'group', 'Team']] : [])];
   $('#tabs').innerHTML = t.map(([k, i, l]) => `<button data-tab="${k}" class="tab flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"><span class="material-symbols-outlined">${i}</span><span class="hidden sm:inline">${l}</span><span data-badge="${k}" class="hidden ml-auto text-[11px] font-bold bg-error text-white rounded-full px-1.5 min-w-[20px] text-center"></span></button>`).join('');
   $$('.tab').forEach(b => b.onclick = () => tab(b.dataset.tab));
 }
@@ -107,6 +118,7 @@ async function loadAll() {
     sb.from('change_requests').select('*').order('created_at', { ascending: false }).limit(200),
     sb.from('admins').select('user_id,email,role'), sb.from('admin_invites').select('*').order('created_at', { ascending: false })]);
   for (const [n, x] of [['Categories', c], ['Videos', v], ['Requests', r], ['Team', a]]) if (x.error) toast(`${n}: ${x.error.message}${/does not exist|column/.test(x.error.message) ? ' — run roles.sql' : ''}`, 1);
+  const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && myNew !== role) { location.reload(); return; }
   cats = c.data || []; videos = v.data || []; reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
   renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites();
 }
@@ -121,11 +133,14 @@ const pendReqFor = (entity, target) => reqs.find(r => r.status === 'pending' && 
 function renderDash() {
   const live = videos.filter(isLive).length, pend = videos.filter(v => v.status === 'pending').length, preq = reqs.filter(r => r.status === 'pending').length;
   const stat = (i, n, l, tabk) => `<button ${tabk ? `data-go="${tabk}"` : ''} class="text-left bg-white rounded-xl border border-outline-variant/40 p-5 hover:border-primary/50 transition"><span class="material-symbols-outlined text-primary">${i}</span><p class="text-3xl font-bold mt-2">${n}</p><p class="text-sm text-on-surface-variant">${l}</p></button>`;
-  $('#stats').innerHTML = stat('movie', videos.length, 'Total videos', 'videos') + stat('public', live, 'Live on website', 'videos') + stat('hourglass_top', pend, 'Videos awaiting review', isSuper() ? 'review' : 'requests') + stat('edit_note', preq, 'Pending changes', isSuper() ? 'review' : 'requests');
+  const mine = videos.filter(v => v.submitted_by === me.id);
+  $('#stats').innerHTML = isSuper()
+    ? stat('movie', videos.length, 'Total videos', 'videos') + stat('public', live, 'Live on website', 'videos') + stat('hourglass_top', pend, 'Videos awaiting review', 'review') + stat('edit_note', preq, 'Pending changes', 'review')
+    : stat('upload', mine.length, 'My uploads', 'requests') + stat('hourglass_top', mine.filter(v => v.status === 'pending').length, 'Waiting for review', 'requests') + stat('public', mine.filter(isLive).length, 'Approved & live', 'requests') + stat('block', mine.filter(v => v.status === 'rejected').length, 'Rejected', 'requests');
   $$('[data-go]').forEach(b => b.onclick = () => tab(b.dataset.go));
   $('#dashNote').innerHTML = isSuper()
     ? (pend + preq ? `<div class="rounded-xl bg-primary-fixed text-on-primary-fixed p-4 flex items-center gap-3"><span class="material-symbols-outlined">notifications_active</span><p class="flex-1 text-sm"><b>${pend + preq}</b> item(s) waiting for your review.</p><button data-go2 class="text-sm font-semibold underline">Open review</button></div>` : '')
-    : `<div class="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant flex gap-3"><span class="material-symbols-outlined text-primary">info</span>You're a <b>&nbsp;normal admin&nbsp;</b>: your uploads and changes go live only after a superadmin approves them.</div>`;
+    : `<div class="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant flex gap-3"><span class="material-symbols-outlined text-primary">info</span>You're an <b>&nbsp;admin&nbsp;</b>: upload videos with “Add video” — they go live only after a superadmin approves them.</div>`;
   $('[data-go2]')?.addEventListener('click', () => tab('review'));
   $('#bySub').innerHTML = mains().map(m => `<div class="bg-white rounded-xl border border-outline-variant/40 p-5"><p class="font-semibold mb-3">${esc(m.name)} <span class="text-on-surface-variant font-normal">(${videos.filter(v => isLive(v) && v.category === m.slug).length})</span></p>
     ${subsOf(m.slug).map(s => { const n = videos.filter(v => isLive(v) && v.subcategory === s.slug).length; return `<div class="flex justify-between text-sm py-1"><span>${esc(s.name)}</span><span class="${n ? '' : 'text-error font-medium'}">${n}</span></div>`; }).join('')}</div>`).join('') || '<p class="text-on-surface-variant">No categories yet.</p>';
@@ -139,43 +154,38 @@ function statusChip(v) {
   const [l, c] = map[v.status] || map.pending;
   return `<span class="inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${c}">${l}</span>${pr ? `<span class="block mt-1 text-[11px] text-amber-700">Change ${pr.action} pending</span>` : ''}${v.status === 'rejected' && v.review_note ? `<span class="block mt-1 text-[11px] text-red-700 max-w-[160px]">“${esc(v.review_note)}”</span>` : ''}`;
 }
-function canDirect(v) { return isSuper() || (v.submitted_by === me.id && v.status !== 'approved'); }
+function canDirect(v) { return isSuper(); }
 function renderVideos() {
   const q = $('#vq').value.toLowerCase().trim(), c = $('#vcat').value, s = $('#vstat').value;
   const list = videos.filter(v => (!q || (v.search_text || (v.title + ' ' + (v.tags || []).join(' '))).toLowerCase().includes(q)) && (!c || v.category === c || v.subcategory === c) &&
     (!s || (s === 'live' && isLive(v)) || (s === 'hidden' && v.status === 'approved' && !v.published) || s === v.status || (s === 'mine' && v.submitted_by === me.id)));
   $('#vempty').classList.toggle('hidden', list.length > 0);
-  $('#vrows').innerHTML = list.map(v => {
-    const direct = canDirect(v), pr = pendReqFor('video', v.id);
-    return `<tr class="border-b border-outline-variant/30 last:border-0 align-top">
+  $('#vrows').innerHTML = list.map(v => `<tr class="border-b border-outline-variant/30 last:border-0 align-top">
     <td class="p-3"><div class="flex items-center gap-3"><button data-play="${v.id}" class="relative w-24 aspect-video rounded-md bg-surface-container overflow-hidden shrink-0" aria-label="Preview">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" loading="lazy" class="w-full h-full object-cover" alt="">` : ''}<span class="material-symbols-outlined absolute inset-0 m-auto h-fit w-fit text-white drop-shadow !text-xl">play_circle</span></button>
       <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
     <td class="p-3 whitespace-nowrap">${esc(cname(v.category))}<br><span class="text-xs text-on-surface-variant">${esc(cname(v.subcategory))}</span></td>
     <td class="p-3 whitespace-nowrap text-xs">${esc(v.resolution)} · ${v.fps}fps<br>${dur(v.duration_seconds)} · ${esc(v.orientation)}</td>
     <td class="p-3">${statusChip(v)}</td>
-    <td class="p-3 text-right whitespace-nowrap">
-      ${isSuper() && v.status === 'pending' ? `<button data-approve="${v.id}" title="Approve" class="material-symbols-outlined p-1.5 rounded hover:bg-green-50 text-green-700">check_circle</button><button data-reject="${v.id}" title="Reject" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">cancel</button>` : ''}
-      ${isSuper() && v.status === 'approved' ? `<button data-pub="${v.id}" title="${v.published ? 'Hide from site' : 'Show on site'}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">${v.published ? 'visibility_off' : 'visibility'}</button>` : ''}
-      ${!pr ? `<button data-edit="${v.id}" title="${direct ? 'Edit' : 'Request edit'}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">edit</button>
-      <button data-del="${v.id}" title="${direct ? 'Delete' : 'Request deletion'}" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">delete</button>` : ''}</td></tr>`;
-  }).join('');
+    <td class="p-3 text-right whitespace-nowrap">${isSuper() ? `
+      ${v.status === 'pending' ? `<button data-approve="${v.id}" title="Approve" class="material-symbols-outlined p-1.5 rounded hover:bg-green-50 text-green-700">check_circle</button><button data-reject="${v.id}" title="Reject" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">cancel</button>` : ''}
+      ${v.status === 'approved' ? `<button data-pub="${v.id}" title="${v.published ? 'Hide from site' : 'Show on site'}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">${v.published ? 'visibility_off' : 'visibility'}</button>` : ''}
+      <button data-edit="${v.id}" title="Edit" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">edit</button>
+      <button data-del="${v.id}" title="Delete" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">delete</button>`
+      : `<button data-play="${v.id}" title="Preview" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">visibility</button>`}</td></tr>`).join('');
 }
 ['#vq', '#vcat', '#vstat'].forEach(s => $(s).addEventListener('input', renderVideos));
 $('#vrows').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return; const d = b.dataset; const v = videos.find(x => x.id === (d.edit || d.del || d.pub || d.approve || d.reject || d.play));
   if (d.play) return preview(v);
+  if (!isSuper()) return;
   if (d.edit) return openVideo(v);
   if (d.approve) return reviewVideo(v, true);
   if (d.reject) return reviewVideo(v, false);
   if (d.pub) { const { error } = await sb.from('videos').update({ published: !v.published }).eq('id', v.id); if (error) return toast(error.message, 1); toast(v.published ? 'Hidden from website' : 'Now visible on website'); return loadAll(); }
   if (d.del) {
-    if (canDirect(v)) {
-      if (!confirm(`Delete "${v.title}"? This also removes its uploaded files.`)) return;
-      const paths = [v.video_url, v.thumbnail_url].map(storagePath).filter(Boolean); if (paths.length) await sb.storage.from('videos').remove(paths);
-      const { error } = await sb.from('videos').delete().eq('id', v.id); if (error) return toast(error.message, 1); toast('Deleted'); return loadAll();
-    }
-    if (!confirm(`Request deletion of "${v.title}"? A superadmin must approve it.`)) return;
-    return request('video', 'delete', v.id, {}, `Delete video “${v.title}”`);
+    if (!confirm(`Delete "${v.title}"? This also removes its uploaded files.`)) return;
+    const paths = [v.video_url, v.thumbnail_url].map(storagePath).filter(Boolean); if (paths.length) await sb.storage.from('videos').remove(paths);
+    const { error } = await sb.from('videos').delete().eq('id', v.id); if (error) return toast(error.message, 1); toast('Deleted'); return loadAll();
   }
 };
 function preview(v) { if (!v?.video_url) return toast('No video file', 1); $('#pvid').src = v.video_url; $('#pmodal').classList.remove('hidden'); $('#pvid').play().catch(() => { }); }
@@ -187,33 +197,57 @@ async function request(entity, action, target, payload, summary) {
   if (error) { toast(error.message, 1); return false; }
   toast('Sent to superadmin for approval'); loadAll(); return true;
 }
+
+// ---- Reject dialog (returns note or null) ----
+const REASONS = ['Poor video quality', 'Wrong category', 'Title / tags need work', 'Duplicate video', 'Copyright concern', 'Not relevant for lawyers/doctors'];
+function askReject(what) {
+  return new Promise(res => {
+    const m = $('#rjmodal'), f = $('#rjform'); f.reset(); $('#rjwhat').textContent = what;
+    $('#rjchips').innerHTML = REASONS.map(r => `<button type="button" class="text-xs px-3 py-1.5 rounded-full border border-outline-variant hover:border-red-400 hover:text-red-700">${r}</button>`).join('');
+    $('#rjchips').onclick = e => { const b = e.target.closest('button'); if (!b) return; const t = f.note.value.trim(); f.note.value = t ? t + (t.endsWith('.') ? ' ' : '. ') + b.textContent + '.' : b.textContent + '.'; f.note.focus(); };
+    const close = v => { m.classList.add('hidden'); f.onsubmit = null; m.onclick = null; document.removeEventListener('keydown', esc_); res(v); };
+    const esc_ = e => { if (e.key === 'Escape') close(null); };
+    f.onsubmit = e => { e.preventDefault(); const n = f.note.value.trim(); if (n) close(n); };
+    m.onclick = e => { if (e.target === m || e.target.closest('[data-close]')) close(null); };
+    document.addEventListener('keydown', esc_);
+    m.classList.remove('hidden'); setTimeout(() => f.note.focus(), 50);
+  });
+}
 async function reviewVideo(v, ok) {
-  let note = null; if (!ok) { note = prompt('Reason for rejection (shown to the uploader):'); if (note === null) return; }
-  const { error } = await sb.from('videos').update({ status: ok ? 'approved' : 'rejected', reviewed_by: me.id, review_note: note }).eq('id', v.id);
+  let note = null; if (!ok) { note = await askReject(v.title); if (note === null) return; }
+  const { error } = await sb.from('videos').update({ status: ok ? 'approved' : 'rejected', published: ok ? true : v.published, reviewed_by: me.id, review_note: note }).eq('id', v.id);
   if (error) return toast(error.message, 1); toast(ok ? 'Approved — now live' : 'Rejected'); loadAll();
 }
 
 function fillCatSelects() {
   const opts = mains().map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join('');
+  const cur = $('#vcat').value;
   $('#vcat').innerHTML = '<option value="">All categories</option>' + mains().map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>` + subsOf(m.slug).map(s => `<option value="${esc(s.slug)}">&nbsp;&nbsp;↳ ${esc(s.name)}</option>`).join('')).join('');
-  $('#vform').category.innerHTML = opts;
+  $('#vcat').value = cur;
+  if ($('#vmodal').classList.contains('hidden')) $('#vform').category.innerHTML = opts;
   $('#cform').parent_slug.innerHTML = '<option value="">— None (main category) —</option>' + opts;
 }
 function fillSubs(sel) { const f = $('#vform'); f.subcategory.innerHTML = subsOf(f.category.value).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); if (sel) f.subcategory.value = sel; }
 $('#vform').category.onchange = () => fillSubs();
 
-let editing = null, thumbBlob = null;
+let editing = null, thumbBlob = null, submitMode = 'submit';
+const BTN = (mode, label, cls) => `<button ${mode ? `data-mode="${mode}"` : 'type="button" data-close'} class="px-4 py-2.5 rounded-lg ${cls}">${label}</button>`;
 function openVideo(v) {
+  if (v && !isSuper()) return;
   editing = v || null; thumbBlob = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
-  $('#vprev').classList.add('hidden'); $('#tprev').classList.add('hidden'); $('#progress').classList.add('hidden');
-  const direct = !v || canDirect(v), n = $('#vnote');
-  n.classList.toggle('hidden', isSuper());
-  n.textContent = !v ? 'This video will be sent to a superadmin for approval before it appears on the website.' : direct ? 'Saving will re-submit this video for approval.' : 'This video is live. Your edits will be sent as a change request — the live version stays until a superadmin approves.';
-  $('#vsave').textContent = isSuper() ? 'Save' : v && !direct ? 'Request change' : 'Submit for review';
+  $('#vprev').classList.add('hidden'); $('#vprev').removeAttribute('src'); $('#progress').classList.add('hidden');
+  $('#vmeta').textContent = 'Duration, resolution, frame rate, orientation and thumbnail are detected automatically.';
+  const n = $('#vnote'); n.classList.toggle('hidden', isSuper()); n.textContent = 'Your video will be sent to a superadmin for review. It appears on the website only after approval.';
+  $('#vbtns').innerHTML = isSuper()
+    ? BTN(null, 'Cancel', 'border border-outline-variant') + BTN('draft', 'Save draft', 'border border-primary text-primary font-semibold') + BTN('approve', 'Approve', 'bg-primary text-on-primary font-semibold')
+    : BTN(null, 'Cancel', 'border border-outline-variant') + BTN('submit', 'Save', 'bg-primary text-on-primary font-semibold');
+  $$('#vbtns [data-close]').forEach(b => b.onclick = () => $('#vmodal').classList.add('hidden'));
+  $$('#vbtns [data-mode]').forEach(b => b.onclick = () => submitMode = b.dataset.mode);
   if (v) {
-    ['title', 'description', 'content', 'video_url', 'thumbnail_url', 'duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = v[k] ?? '');
-    f.category.value = v.category; f.tags.value = (v.tags || []).join(', '); f.published.checked = v.published;
-    if (v.thumbnail_url) { $('#tprev').src = v.thumbnail_url; $('#tprev').classList.remove('hidden'); }
+    ['title', 'description', 'duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = v[k] ?? '');
+    f.category.value = v.category; f.tags.value = (v.tags || []).join(', ');
+    if (v.video_url) { $('#vprev').src = v.video_url; $('#vprev').classList.remove('hidden'); }
+    $('#vmeta').textContent = `Current: ${v.resolution} · ${v.fps}fps · ${dur(v.duration_seconds)} · ${v.orientation}. Choose a new file only to replace it.`;
   }
   fillSubs(v?.subcategory); $('#vmodal').classList.remove('hidden'); f.title.focus();
 }
@@ -221,22 +255,37 @@ $('#newVideo').onclick = () => openVideo();
 $$('#vmodal [data-close], #cmodal [data-close]').forEach(b => b.onclick = () => b.closest('.fixed').classList.add('hidden'));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') ['#vmodal', '#cmodal'].forEach(s => $(s).classList.add('hidden')); });
 
+// Estimate frame rate by sampling decoded frames (Chrome/Edge/Safari); falls back to 30
+function detectFps(vid) {
+  return new Promise(res => {
+    if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return res(30);
+    const t = []; let done = false; const finish = () => {
+      if (done) return; done = true; vid.pause();
+      const d = []; for (let i = 1; i < t.length; i++) { const x = t[i] - t[i - 1]; if (x > 0.001 && x < 0.2) d.push(x); }
+      if (d.length < 5) return res(30); d.sort((a, b) => a - b); const raw = 1 / d[Math.floor(d.length / 2)];
+      res([24, 25, 30, 48, 50, 60, 120].reduce((a, b) => Math.abs(b - raw) < Math.abs(a - raw) ? b : a));
+    };
+    const cb = (_, m) => { t.push(m.mediaTime); if (t.length > 40) finish(); else vid.requestVideoFrameCallback(cb); };
+    vid.requestVideoFrameCallback(cb); vid.muted = true; vid.playbackRate = 1; vid.play().catch(() => res(30)); setTimeout(finish, 2500);
+  });
+}
 $('#vform').vfile.onchange = e => {
   const file = e.target.files[0]; if (!file) return; const f = $('#vform'), vid = $('#vprev');
   if (file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
-  vid.src = URL.createObjectURL(file); vid.classList.remove('hidden');
+  vid.src = URL.createObjectURL(file); vid.classList.remove('hidden'); $('#vmeta').textContent = 'Analysing video…';
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  vid.onloadedmetadata = () => {
+  vid.onloadedmetadata = async () => {
     f.duration_seconds.value = Math.round(vid.duration); const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h);
     f.resolution.value = big >= 3000 ? '4K' : big >= 1800 ? '1080p' : '720p'; f.orientation.value = w > h ? 'horizontal' : w < h ? 'vertical' : 'square';
+    f.fps.value = await detectFps(vid);
+    vid.onseeked = () => {
+      const cv = document.createElement('canvas'); const sc = Math.min(1, 1280 / vid.videoWidth); cv.width = vid.videoWidth * sc; cv.height = vid.videoHeight * sc;
+      cv.getContext('2d').drawImage(vid, 0, 0, cv.width, cv.height); cv.toBlob(b => { thumbBlob = b; }, 'image/jpeg', 0.82); vid.onseeked = null;
+    };
     vid.currentTime = Math.min(1, vid.duration / 3);
-  };
-  vid.onseeked = () => {
-    if (f.tfile.files[0]) return; const cv = document.createElement('canvas'); const sc = Math.min(1, 1280 / vid.videoWidth); cv.width = vid.videoWidth * sc; cv.height = vid.videoHeight * sc;
-    cv.getContext('2d').drawImage(vid, 0, 0, cv.width, cv.height); cv.toBlob(b => { thumbBlob = b; $('#tprev').src = URL.createObjectURL(b); $('#tprev').classList.remove('hidden'); }, 'image/jpeg', 0.82); vid.onseeked = null;
+    $('#vmeta').textContent = `Detected: ${w}×${h} (${f.resolution.value}) · ${f.fps.value}fps · ${dur(+f.duration_seconds.value)} · ${f.orientation.value}. Thumbnail created automatically.`;
   };
 };
-$('#vform').tfile.onchange = e => { const t = e.target.files[0]; if (t) { thumbBlob = null; $('#tprev').src = URL.createObjectURL(t); $('#tprev').classList.remove('hidden'); } };
 
 async function upload(fileOrBlob, name, label) {
   $('#ptext').textContent = 'Uploading ' + label + '…';
@@ -246,31 +295,30 @@ async function upload(fileOrBlob, name, label) {
   return sb.storage.from('videos').getPublicUrl(path).data.publicUrl;
 }
 $('#vform').onsubmit = async e => {
-  e.preventDefault(); const f = e.target, btn = $('#vsave'), label = btn.textContent; btn.disabled = true; btn.textContent = 'Saving…'; $('#progress').classList.remove('hidden'); $('#bar').style.width = '10%';
+  e.preventDefault(); const f = e.target, mode = isSuper() ? (e.submitter?.dataset.mode || submitMode) : 'submit';
+  const btns = $$('#vbtns button'); btns.forEach(b => b.disabled = true); $('#progress').classList.remove('hidden'); $('#bar').style.width = '10%';
   try {
+    const vf = f.vfile.files[0];
+    if (!editing && !vf) throw new Error('Choose a video file to upload');
+    if (!f.subcategory.value) throw new Error('Pick a subcategory');
+    if (vf && !f.duration_seconds.value) throw new Error('Still analysing the video — try again in a second');
     const row = {
-      title: f.title.value.trim(), description: f.description.value.trim(), content: f.content.value.trim(), category: f.category.value, subcategory: f.subcategory.value,
-      video_url: f.video_url.value.trim() || null, thumbnail_url: f.thumbnail_url.value || null, duration_seconds: +f.duration_seconds.value || 0, resolution: f.resolution.value,
-      fps: +f.fps.value, orientation: f.orientation.value, tags: [...new Set(f.tags.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))], published: f.published.checked
+      title: f.title.value.trim(), description: f.description.value.trim(), category: f.category.value, subcategory: f.subcategory.value,
+      duration_seconds: +f.duration_seconds.value || 0, resolution: f.resolution.value || '1080p', fps: +f.fps.value || 30, orientation: f.orientation.value || 'horizontal',
+      tags: [...new Set(f.tags.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]
     };
-    if (!row.subcategory) throw new Error('Pick a subcategory');
-    const vf = f.vfile.files[0], tf = f.tfile.files[0];
-    if (!editing && !vf && !row.video_url) throw new Error('Add a video file or URL');
-    if (vf) { row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '70%'; }
-    if (tf) row.thumbnail_url = await upload(tf, tf.name, 'thumbnail'); else if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail');
+    if (isSuper()) { row.status = 'approved'; row.published = mode === 'approve'; } else { row.published = true; }
+    if (vf) { row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '70%'; if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail'); }
     $('#bar').style.width = '90%'; $('#ptext').textContent = 'Saving details…';
-    if (editing && !canDirect(editing)) {
-      const ok = await request('video', 'update', editing.id, row, `Edit video “${editing.title}”`); if (!ok) throw new Error('Request failed');
-    } else {
-      const old = editing ? { v: editing.video_url, t: editing.thumbnail_url } : {};
-      const { error } = editing ? await sb.from('videos').update(row).eq('id', editing.id) : await sb.from('videos').insert(row);
-      if (error) throw error;
-      const stale = [old.v !== row.video_url && old.v, old.t !== row.thumbnail_url && old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale);
-      toast(isSuper() ? (editing ? 'Video updated' : 'Video published') : 'Submitted — waiting for superadmin approval'); loadAll();
-    }
-    $('#bar').style.width = '100%'; $('#vmodal').classList.add('hidden');
+    const old = editing ? { v: editing.video_url, t: editing.thumbnail_url } : {};
+    if (editing && row.status === 'approved') { row.reviewed_by = me.id; row.review_note = null; }
+    const { error } = editing ? await sb.from('videos').update(row).eq('id', editing.id) : await sb.from('videos').insert(row);
+    if (error) throw error;
+    if (vf) { const stale = [old.v, old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale); }
+    toast(!isSuper() ? 'Submitted — waiting for superadmin approval' : mode === 'approve' ? 'Approved — live on website' : 'Saved as draft (hidden from website)');
+    $('#bar').style.width = '100%'; $('#vmodal').classList.add('hidden'); loadAll();
   } catch (err) { toast(err.message, 1); $('#ptext').textContent = err.message; }
-  btn.disabled = false; btn.textContent = label;
+  btns.forEach(b => b.disabled = false);
 };
 
 // ---------------- REVIEW (superadmin) ----------------
@@ -310,7 +358,7 @@ $('#t-review').onclick = async e => {
   if (d.vok || d.vno) return reviewVideo(videos.find(v => v.id === (d.vok || d.vno)), !!d.vok);
   if (d.vedit) return openVideo(videos.find(v => v.id === d.vedit));
   if (d.rok || d.rno) {
-    let note = null; if (d.rno) { note = prompt('Reason for rejection:'); if (note === null) return; }
+    let note = null; if (d.rno) { note = await askReject(reqs.find(r => r.id === d.rno)?.summary || 'Change request'); if (note === null) return; }
     b.disabled = true; const { error } = await sb.rpc('review_change_request', { p_id: d.rok || d.rno, p_approve: !!d.rok, p_note: note });
     if (error) { b.disabled = false; return toast(error.message, 1); } toast(d.rok ? 'Approved & applied' : 'Rejected'); loadAll();
   }
@@ -319,13 +367,16 @@ $('#t-review').onclick = async e => {
 // ---------------- MY REQUESTS (admin) ----------------
 function renderMyReq() {
   if (isSuper()) return;
-  const mv = videos.filter(v => v.submitted_by === me.id && v.status !== 'approved');
-  const mr = reqs.filter(r => r.requested_by === me.id);
-  $('#myReq').innerHTML = (mv.length ? `<h2 class="font-semibold">Uploads</h2>` + mv.map(v => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><div class="w-20 aspect-video rounded bg-surface-container overflow-hidden shrink-0">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}</div><div class="flex-1 min-w-0"><p class="font-medium truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${new Date(v.created_at).toLocaleString()}</p></div>${statusChip(v)}</div>`).join('') : '')
-    + (mr.length ? `<h2 class="font-semibold pt-4">Change requests</h2>` + mr.map(r => reqCard(r, false)).join('') : '')
-    || '<p class="text-on-surface-variant">You have no pending uploads or requests.</p>';
+  const mv = videos.filter(v => v.submitted_by === me.id);
+  const chip = v => ({ pending: ['Waiting for review', 'bg-amber-100 text-amber-800', 'hourglass_top'], approved: [v.published ? 'Approved · Live' : 'Approved · Hidden', 'bg-green-100 text-green-800', 'check_circle'], rejected: ['Rejected', 'bg-red-100 text-red-800', 'block'] }[v.status] || ['Pending', 'bg-amber-100 text-amber-800', 'hourglass_top']);
+  $('#myReq').innerHTML = mv.map(v => { const [l, c, i] = chip(v); return `<div class="bg-white rounded-xl border border-outline-variant/40 p-4">
+    <div class="flex items-center gap-3"><button data-play="${v.id}" class="w-24 aspect-video rounded bg-surface-container overflow-hidden shrink-0">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}</button>
+    <div class="flex-1 min-w-0"><p class="font-medium truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${esc(cname(v.category))} › ${esc(cname(v.subcategory))} · ${new Date(v.created_at).toLocaleString()}</p></div>
+    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${c}"><span class="material-symbols-outlined !text-sm">${i}</span>${l}</span></div>
+    ${v.status === 'rejected' && v.review_note ? `<div class="mt-3 rounded-lg bg-red-50 border border-red-100 p-3 text-sm text-red-800"><b>Reason:</b> ${esc(v.review_note)}</div>` : ''}</div>`; }).join('')
+    || '<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined !text-5xl">video_library</span><p class="mt-2">You haven\'t uploaded any videos yet.</p></div>';
 }
-$('#myReq').onclick = async e => { const id = e.target.closest('[data-rcancel]')?.dataset.rcancel; if (!id || !confirm('Cancel this request?')) return; const { error } = await sb.from('change_requests').delete().eq('id', id); if (error) return toast(error.message, 1); toast('Cancelled'); loadAll(); };
+$('#myReq').onclick = async e => { const pl = e.target.closest('[data-play]')?.dataset.play; if (pl) return preview(videos.find(v => v.id === pl)); const id = e.target.closest('[data-rcancel]')?.dataset.rcancel; if (!id || !confirm('Cancel this request?')) return; const { error } = await sb.from('change_requests').delete().eq('id', id); if (error) return toast(error.message, 1); toast('Cancelled'); loadAll(); };
 
 // ---------------- CATEGORIES ----------------
 function renderCats() {

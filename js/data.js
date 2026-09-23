@@ -53,7 +53,14 @@ async function counts(){const s=await client();const m={};
   else SAMPLE.forEach(v=>m[v.category]=(m[v.category]||0)+1);return m;}
 async function loadCats(){const s=await client();if(!s)return;const {data,error}=await s.from('categories').select('slug,name,parent_slug,icon,blurb,sort').order('sort');if(error||!data?.length)return;
   const main=data.filter(c=>!c.parent_slug);CATS.length=0;main.forEach(m=>CATS.push({slug:m.slug,name:m.name,icon:m.icon||'movie',blurb:m.blurb||'',subs:data.filter(c=>c.parent_slug===m.slug).map(c=>[c.slug,c.name])}));}
-window.ES={CATS,client,ready:loadCats().catch(e=>console.error(e)),listVideos,getVideo,counts,
+// Live updates: re-render when videos/categories change (realtime + tab focus + 60s safety poll)
+const subs=[];let lt=null,ch=null;
+async function fire(){cache.clear();try{await loadCats()}catch{};subs.forEach(f=>{try{f()}catch(e){console.error(e)}})}
+const bump=()=>{clearTimeout(lt);lt=setTimeout(fire,500)};
+async function onChange(cb){subs.push(cb);if(subs.length>1)return;
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)bump()});setInterval(()=>{if(!document.hidden)bump()},60000);
+  const s=await client();if(!s)return;ch=s.channel('site-live');['videos','categories'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},bump));ch.subscribe();}
+window.ES={CATS,client,onChange,ready:loadCats().catch(e=>console.error(e)),listVideos,getVideo,counts,
   cat:slug=>CATS.find(c=>c.slug===slug),
   subName:(c,s)=>(CATS.find(x=>x.slug===c)?.subs.find(x=>x[0]===s)||[,s])[1],
   dur:s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
