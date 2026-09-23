@@ -70,8 +70,8 @@
 
 <section id="t-team" class="hidden"><h1 class="text-2xl font-bold mb-6">Team</h1>
 <form id="addAdmin" class="bg-white rounded-xl border border-outline-variant/40 p-4 flex flex-wrap gap-2 items-end mb-6"><div class="flex-1 min-w-[220px]"><label class="text-sm font-medium">Email</label><input name="email" type="email" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></div>
-<div><label class="text-sm font-medium">Role</label><select name="role" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><option value="admin">Admin</option><option value="superadmin">Superadmin</option></select></div><button class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold">Add</button>
-<p class="w-full text-xs text-on-surface-variant">New person? Add them here first, then send the invite from Supabase → Authentication → Users → <b>Invite user</b>. When they accept, they set a password and get this role automatically.</p></form>
+<div><label class="text-sm font-medium">Role</label><select name="role" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><option value="admin">Admin</option><option value="superadmin">Superadmin</option></select></div><button class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2"><span class="material-symbols-outlined !text-lg">send</span>Send invite</button>
+<p class="w-full text-xs text-on-surface-variant">Sends an invite email. They click it, create a password and get this role. Existing users get the role immediately.</p></form>
 <div class="bg-white rounded-xl border border-outline-variant/40 overflow-hidden"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Email</th><th class="p-3">Role</th><th class="p-3 text-right">Actions</th></tr></thead><tbody id="teamRows"></tbody></table></div><h2 class="font-semibold mt-8 mb-3">Invited — not accepted yet</h2><div id="inviteRows" class="space-y-2"></div></section>
 </main></div>
 

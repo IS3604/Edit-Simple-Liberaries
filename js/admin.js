@@ -386,8 +386,21 @@ function renderTeam() {
 }
 $('#teamRows').onchange = async e => { const id = e.target.dataset.role; if (!id) return; const { error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id); if (error) return toast(error.message, 1); toast('Role updated'); loadAll(); };
 $('#teamRows').onclick = async e => { const id = e.target.dataset.rm; if (!id || !confirm('Remove admin access for this user?')) return; const { error } = await sb.from('admins').delete().eq('user_id', id); if (error) return toast(error.message, 1); toast('Removed'); loadAll(); };
-$('#addAdmin').onsubmit = async e => { e.preventDefault(); const f = e.target; const { data, error } = await sb.rpc('add_admin', { p_email: f.email.value.trim(), p_role: f.role.value }); if (error) return toast(error.message, 1);
-  toast(data === 'invited' ? 'Saved. Now send the invite from Supabase → Authentication → Users → Invite user' : 'Admin added'); f.reset(); loadAll(); };
+$('#addAdmin').onsubmit = async e => {
+  e.preventDefault(); const f = e.target, b = f.querySelector('button'), lbl = b.innerHTML; b.disabled = true; b.textContent = 'Sending…';
+  const { data, error } = await sb.functions.invoke('invite-admin', { body: { email: f.email.value.trim(), role: f.role.value, redirectTo: ADMIN_URL } });
+  b.disabled = false; b.innerHTML = lbl;
+  let msg = error?.message; if (error && error.context?.json) { try { msg = (await error.context.json()).error || msg; } catch { } }
+  if (error) {
+    if (/Failed to send|not found|404|FunctionsFetchError|FunctionsRelayError/i.test(msg || '')) {  // function not deployed → fallback
+      const r = await sb.rpc('add_admin', { p_email: f.email.value.trim(), p_role: f.role.value });
+      if (r.error) return toast(r.error.message, 1);
+      toast(r.data === 'invited' ? 'Role saved. Invite function not deployed — send invite from Supabase → Users → Invite user' : 'Admin added'); f.reset(); return loadAll();
+    }
+    return toast(msg, 1);
+  }
+  toast(data?.status === 'sent' ? 'Invite email sent to ' + f.email.value.trim() : (data?.note || 'Done')); f.reset(); loadAll();
+};
 function renderInvites() { const el = $('#inviteRows'); if (!el) return;
   el.innerHTML = invites.map(i => `<div class="bg-white rounded-xl border border-outline-variant/40 p-3 flex items-center gap-3 text-sm"><span class="material-symbols-outlined text-primary">mail</span><span class="flex-1">${esc(i.email)} <span class="text-xs text-on-surface-variant">· ${esc(i.role)}</span></span><button data-uninv="${esc(i.email)}" class="text-error font-medium">Cancel</button></div>`).join('') || '<p class="text-sm text-on-surface-variant">No pending invites.</p>'; }
 $('#inviteRows').onclick = async e => { const em = e.target.dataset.uninv; if (!em) return; const { error } = await sb.from('admin_invites').delete().eq('email', em); if (error) return toast(error.message, 1); loadAll(); };
