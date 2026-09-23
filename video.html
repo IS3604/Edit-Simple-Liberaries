@@ -19,7 +19,7 @@ const e=esEsc,c=ES.cat(v.category),sn=ES.subName(v.category,v.subcategory);docum
 document.querySelector('meta[name=description]').content=(v.description||v.title).slice(0,155);
 root.innerHTML=`<nav aria-label="Breadcrumb" class="text-sm text-on-surface-variant flex flex-wrap items-center gap-1 mb-6"><a href="index.html" class="hover:text-primary">Home</a> / <a class="hover:text-primary" href="videos.html?cat=${v.category}">${e(c?.name)}</a> / <a class="hover:text-primary" href="videos.html?cat=${v.category}&sub=${v.subcategory}">${e(sn)}</a></nav>
 <div class="grid lg:grid-cols-12 gap-8"><section class="lg:col-span-8">
-<div class="rounded-2xl overflow-hidden bg-black aspect-video relative">${v.video_url?`<video controls playsinline preload="metadata" poster="${e(v.thumbnail_url||'')}" src="${e(v.video_url)}" class="w-full h-full object-contain"></video>`:`<div class="absolute inset-0 bg-gradient-to-br from-orange-300 to-amber-600 flex flex-col items-center justify-center text-white"><span class="material-symbols-outlined !text-7xl">${c?.icon||'movie'}</span><p class="mt-2 text-sm opacity-90">Preview not available</p></div>`}</div>
+<div class="rounded-2xl overflow-hidden bg-black aspect-video relative">${v.video_url?`<video controls controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false" playsinline preload="metadata" poster="${e(v.thumbnail_url||'')}" src="${e(v.video_url)}" class="w-full h-full object-contain"></video>`:`<div class="absolute inset-0 bg-gradient-to-br from-orange-300 to-amber-600 flex flex-col items-center justify-center text-white"><span class="material-symbols-outlined !text-7xl">${c?.icon||'movie'}</span><p class="mt-2 text-sm opacity-90">Preview not available</p></div>`}</div>
 <h1 class="mt-6 text-2xl md:text-4xl font-bold">${e(v.title)}</h1>
 <p class="mt-3 text-on-surface-variant">${e(v.description||'')}</p>
 ${v.content?`<div class="mt-5 rounded-xl bg-surface-container-low p-4"><p class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-1">What's in this video</p><p class="text-sm">${e(v.content)}</p></div>`:''}
@@ -30,7 +30,13 @@ ${v.content?`<div class="mt-5 rounded-xl bg-surface-container-low p-4"><p class=
 <button id="dl" class="w-full bg-primary text-on-primary rounded-xl py-3 font-semibold flex items-center justify-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">download</span>Download</button>
 <button id="share" class="w-full mt-3 border border-outline-variant rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:border-primary hover:text-primary"><span class="material-symbols-outlined">share</span>Copy link</button></div></aside></div>
 <section class="mt-16"><h2 class="text-xl font-bold mb-4">More in ${e(sn)}</h2><div id="rel" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">${esSkel(3)}</div></section>`;
-document.getElementById('dl').onclick=()=>{if(!v.video_url)return esToast('Download not available yet');const a=document.createElement('a');a.href=v.video_url;a.download='';a.target='_blank';a.rel='noopener';a.click()};
+document.getElementById('dl').onclick=async e=>{if(!v.video_url)return esToast('Download not available yet');
+ const b=e.currentTarget,lbl=b.innerHTML,ext=(v.video_url.split('?')[0].match(/\.(\w{2,4})$/)||[,'mp4'])[1],name=(v.title.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,80)||'video')+'.'+ext;
+ const save=href=>{const a=document.createElement('a');a.href=href;a.download=name;document.body.appendChild(a);a.click();a.remove()};
+ if(/\/storage\/v1\/object\/public\//.test(v.video_url)){save(v.video_url+(v.video_url.includes('?')?'&':'?')+'download='+encodeURIComponent(name));return esToast('Download started')}
+ b.disabled=true;b.innerHTML='<span class="material-symbols-outlined animate-spin">progress_activity</span>Preparing…';
+ try{const r=await fetch(v.video_url);if(!r.ok)throw 0;const u=URL.createObjectURL(await r.blob());save(u);setTimeout(()=>URL.revokeObjectURL(u),6e4);esToast('Download started')}
+ catch{esToast('Could not download this file')}b.disabled=false;b.innerHTML=lbl};
 document.getElementById('share').onclick=()=>{navigator.clipboard?.writeText(location.href);esToast('Link copied')};
 let rel=(await ES.listVideos({category:v.category})).filter(x=>x.id!==v.id);rel.sort((a,b)=>(b.subcategory===v.subcategory)-(a.subcategory===v.subcategory));
 const r=document.getElementById('rel');r.innerHTML=rel.slice(0,3).map(esCard).join('')||'<p class="text-on-surface-variant">No related videos yet.</p>';esHoverPlay(r);});

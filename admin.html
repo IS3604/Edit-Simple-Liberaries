@@ -17,7 +17,23 @@
 <img src="logo.png" width="56" height="56" class="h-14 w-14 rounded-xl mx-auto mb-4" alt=""><h1 class="text-2xl font-bold text-center mb-1">Admin Login</h1><p class="text-sm text-center text-on-surface-variant mb-6">Edit Simple Libraries</p>
 <label class="text-sm font-medium">Email</label><input name="email" type="email" autocomplete="username" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4">
 <label class="text-sm font-medium">Password</label><input name="password" type="password" autocomplete="current-password" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-6">
-<button class="w-full bg-primary text-on-primary rounded-lg py-3 font-semibold hover:brightness-95">Log in</button><p id="loginErr" class="text-sm text-error mt-3 text-center"></p></form></div>
+<button class="w-full bg-primary text-on-primary rounded-lg py-3 font-semibold hover:brightness-95">Log in</button><p id="loginErr" class="text-sm text-error mt-3 text-center"></p>
+<button type="button" id="forgotBtn" class="block mx-auto mt-2 text-sm text-primary font-medium">Forgot password?</button></form></div>
+
+<!-- SET PASSWORD (invite / reset / first login) -->
+<div id="setpw" style="display:none" class="min-h-screen flex items-center justify-center px-4 bg-surface-container-low">
+<form id="setpwForm" class="w-full max-w-sm bg-white border border-outline-variant/50 rounded-2xl p-8 shadow-xl">
+<img src="logo.png" width="56" height="56" class="h-14 w-14 rounded-xl mx-auto mb-4" alt=""><h1 id="setpwTitle" class="text-2xl font-bold text-center mb-1">Create your password</h1><p id="setpwSub" class="text-sm text-center text-on-surface-variant mb-6"></p>
+<label class="text-sm font-medium">Email (your login ID)</label><input id="setpwEmail" disabled class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4 bg-surface-container-low text-on-surface-variant">
+<label class="text-sm font-medium">New password</label><input name="pw" type="password" minlength="8" autocomplete="new-password" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4">
+<label class="text-sm font-medium">Confirm password</label><input name="pw2" type="password" minlength="8" autocomplete="new-password" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-2">
+<p class="text-xs text-on-surface-variant mb-6">At least 8 characters.</p>
+<button class="w-full bg-primary text-on-primary rounded-lg py-3 font-semibold hover:brightness-95">Save password &amp; continue</button><p id="setpwErr" class="text-sm text-error mt-3 text-center"></p></form></div>
+
+<!-- LINK STATUS -->
+<div id="linkmsg" style="display:none" class="min-h-screen flex items-center justify-center px-4 bg-surface-container-low"><div class="w-full max-w-sm bg-white border border-outline-variant/50 rounded-2xl p-8 shadow-xl text-center">
+<img src="logo.png" width="56" height="56" class="h-14 w-14 rounded-xl mx-auto mb-4" alt=""><h1 id="linkTitle" class="text-xl font-bold mb-2"></h1><p id="linkText" class="text-sm text-on-surface-variant mb-6"></p>
+<a href="admin.html" class="inline-block bg-primary text-on-primary rounded-lg px-6 py-3 font-semibold">Go to login</a></div></div>
 
 <!-- APP -->
 <div id="app" style="display:none" class="min-h-screen md:flex">
@@ -53,10 +69,10 @@
 <p id="catHint" class="text-sm text-on-surface-variant mb-6"></p><div id="catList" class="grid gap-4 md:grid-cols-3"></div></section>
 
 <section id="t-team" class="hidden"><h1 class="text-2xl font-bold mb-6">Team</h1>
-<form id="addAdmin" class="bg-white rounded-xl border border-outline-variant/40 p-4 flex flex-wrap gap-2 items-end mb-6"><div class="flex-1 min-w-[220px]"><label class="text-sm font-medium">Email of existing user</label><input name="email" type="email" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></div>
+<form id="addAdmin" class="bg-white rounded-xl border border-outline-variant/40 p-4 flex flex-wrap gap-2 items-end mb-6"><div class="flex-1 min-w-[220px]"><label class="text-sm font-medium">Email</label><input name="email" type="email" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></div>
 <div><label class="text-sm font-medium">Role</label><select name="role" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><option value="admin">Admin</option><option value="superadmin">Superadmin</option></select></div><button class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold">Add</button>
-<p class="w-full text-xs text-on-surface-variant">Create the user first in Supabase → Authentication → Users (auto-confirm), then add them here.</p></form>
-<div class="bg-white rounded-xl border border-outline-variant/40 overflow-hidden"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Email</th><th class="p-3">Role</th><th class="p-3 text-right">Actions</th></tr></thead><tbody id="teamRows"></tbody></table></div></section>
+<p class="w-full text-xs text-on-surface-variant">New person? Add them here first, then send the invite from Supabase → Authentication → Users → <b>Invite user</b>. When they accept, they set a password and get this role automatically.</p></form>
+<div class="bg-white rounded-xl border border-outline-variant/40 overflow-hidden"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Email</th><th class="p-3">Role</th><th class="p-3 text-right">Actions</th></tr></thead><tbody id="teamRows"></tbody></table></div><h2 class="font-semibold mt-8 mb-3">Invited — not accepted yet</h2><div id="inviteRows" class="space-y-2"></div></section>
 </main></div>
 
 <!-- VIDEO MODAL -->

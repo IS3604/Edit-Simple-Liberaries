@@ -1,6 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const C = window.ES_CONFIG;
+// Read email-link params BEFORE the client consumes the URL hash
+const QS = new URLSearchParams(location.search), HP = new URLSearchParams(location.hash.slice(1));
+const LINK = { hash: QS.get('token_hash'), type: QS.get('type') || HP.get('type'), err: QS.get('error_description') || HP.get('error_description') };
 const sb = createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+const ADMIN_URL = location.origin + location.pathname;
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const toast = (m, err) => { const t = document.createElement('div'); t.textContent = m; t.setAttribute('role', 'status'); t.className = `fixed left-1/2 -translate-x-1/2 bottom-6 z-[80] px-5 py-3 rounded-xl text-sm shadow-xl text-white max-w-[90vw] ${err ? 'bg-red-700' : 'bg-neutral-900'}`; document.body.appendChild(t); setTimeout(() => t.remove(), 4000); };
@@ -8,17 +12,55 @@ const dur = s => `${Math.floor((s || 0) / 60)}:${String((s || 0) % 60).padStart(
 const skRows = (n, cols) => Array.from({ length: n }, () => `<tr>${Array.from({ length: cols }, (_, i) => `<td class="p-3"><div class="sk h-${i ? 4 : 12} ${i ? 'w-20' : 'w-48'}"></div></td>`).join('')}</tr>`).join('');
 const skCards = (n, h = 28) => Array.from({ length: n }, () => `<div class="sk h-${h} !rounded-xl"></div>`).join('');
 
-let me = null, role = null, cats = [], videos = [], reqs = [], team = [];
+let me = null, role = null, cats = [], videos = [], reqs = [], team = [], invites = [];
 const isSuper = () => role === 'superadmin';
 
 // ---------------- AUTH ----------------
-function show(w) { ['boot', 'login', 'app'].forEach(id => { const el = $('#' + id); el.classList.remove('hidden'); el.style.display = id === w ? '' : 'none'; }); }
-async function boot() {
+function show(w) { ['boot', 'login', 'app', 'setpw', 'linkmsg'].forEach(id => { const el = $('#' + id); el.classList.remove('hidden'); el.style.display = id === w ? '' : 'none'; }); }
+const cleanUrl = () => history.replaceState(null, '', ADMIN_URL);
+function linkMsg(t, m) { $('#linkTitle').textContent = t; $('#linkText').textContent = m; show('linkmsg'); }
+function askPassword(user, mode) {
+  $('#setpwEmail').value = user.email;
+  $('#setpwTitle').textContent = mode === 'recovery' ? 'Reset your password' : 'Create your password';
+  $('#setpwSub').textContent = mode === 'recovery' ? 'Choose a new password for your account.' : 'Welcome to Edit Simple Libraries! Set a password to finish creating your admin account.';
+  show('setpw');
+}
+$('#setpwForm').onsubmit = async e => {
+  e.preventDefault(); const f = e.target, err = $('#setpwErr'), b = f.querySelector('button'); err.textContent = '';
+  if (f.pw.value !== f.pw2.value) return err.textContent = 'Passwords do not match.';
+  b.disabled = true; b.textContent = 'Saving…';
+  const { error } = await sb.auth.updateUser({ password: f.pw.value, data: { password_set: true } });
+  b.disabled = false; b.textContent = 'Save password & continue';
+  if (error) return err.textContent = error.message;
+  toast('Password saved'); show('boot'); boot(true);
+};
+$('#forgotBtn').onclick = async () => {
+  const email = $('#loginForm').email.value.trim(); if (!email) { $('#loginErr').textContent = 'Enter your email above first.'; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: ADMIN_URL });
+  if (error) $('#loginErr').textContent = error.message; else toast('Reset link sent — check your inbox');
+};
+// Handles links from Supabase emails (invite, signup, magic link, reset, email change)
+async function handleLink() {
+  const LINK0 = { ...LINK }; LINK.hash = LINK.type = LINK.err = null; { const LINK = LINK0;
+  if (LINK.err) { cleanUrl(); linkMsg('Link expired or invalid', LINK.err.replace(/\+/g, ' ') + '. Ask for a new link or use "Forgot password".'); return 'stop'; }
+  if (LINK.hash && LINK.type) {
+    const { error } = await sb.auth.verifyOtp({ token_hash: LINK.hash, type: LINK.type });
+    cleanUrl();
+    if (error) { linkMsg('Link expired or invalid', error.message + '. Ask for a new link or use "Forgot password".'); return 'stop'; }
+  } else if (LINK.type) { await sb.auth.getSession(); cleanUrl(); }
+  if (LINK.type === 'email_change') toast('Email address updated');
+  if (LINK.type === 'signup' || LINK.type === 'email') toast('Email confirmed');
+  return LINK.type; }
+}
+let linkType = null;
+async function boot(skipLink) {
+  if (!skipLink) { linkType = await handleLink(); if (linkType === 'stop') return; }
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return show('login');
   me = session.user;
+  if (!skipLink && (linkType === 'invite' || linkType === 'recovery' || (['magiclink', 'signup', 'email'].includes(linkType) && !me.user_metadata?.password_set))) return askPassword(me, linkType);
   const { data: r } = await sb.rpc('my_role');
-  if (!r) { await sb.auth.signOut(); $('#loginErr').textContent = 'This account is not an admin.'; return show('login'); }
+  if (!r) { await sb.auth.signOut(); $('#loginErr').textContent = 'This account has no admin access yet. Ask a superadmin to add you in Team.'; return show('login'); }
   role = r;
   $('#meEmail').textContent = me.email;
   $('#meRole').textContent = role; $('#meRole').className += isSuper() ? ' bg-primary text-on-primary' : ' bg-surface-container text-on-surface-variant';
@@ -59,14 +101,14 @@ function paintSkeletons() {
 
 // ---------------- DATA ----------------
 async function loadAll() {
-  const [c, v, r, a] = await Promise.all([
+  const [c, v, r, a, inv] = await Promise.all([
     sb.from('categories').select('*').order('sort'),
     sb.from('videos').select('*').order('created_at', { ascending: false }),
     sb.from('change_requests').select('*').order('created_at', { ascending: false }).limit(200),
-    sb.from('admins').select('user_id,email,role')]);
+    sb.from('admins').select('user_id,email,role'), sb.from('admin_invites').select('*').order('created_at', { ascending: false })]);
   for (const [n, x] of [['Categories', c], ['Videos', v], ['Requests', r], ['Team', a]]) if (x.error) toast(`${n}: ${x.error.message}${/does not exist|column/.test(x.error.message) ? ' — run roles.sql' : ''}`, 1);
-  cats = c.data || []; videos = v.data || []; reqs = r.data || []; team = a.data || [];
-  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderMyReq(); renderTeam();
+  cats = c.data || []; videos = v.data || []; reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
+  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites();
 }
 const mains = () => cats.filter(c => !c.parent_slug);
 const subsOf = m => cats.filter(c => c.parent_slug === m);
@@ -344,6 +386,10 @@ function renderTeam() {
 }
 $('#teamRows').onchange = async e => { const id = e.target.dataset.role; if (!id) return; const { error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id); if (error) return toast(error.message, 1); toast('Role updated'); loadAll(); };
 $('#teamRows').onclick = async e => { const id = e.target.dataset.rm; if (!id || !confirm('Remove admin access for this user?')) return; const { error } = await sb.from('admins').delete().eq('user_id', id); if (error) return toast(error.message, 1); toast('Removed'); loadAll(); };
-$('#addAdmin').onsubmit = async e => { e.preventDefault(); const f = e.target; const { error } = await sb.rpc('add_admin', { p_email: f.email.value.trim(), p_role: f.role.value }); if (error) return toast(error.message, 1); toast('Admin added'); f.reset(); loadAll(); };
+$('#addAdmin').onsubmit = async e => { e.preventDefault(); const f = e.target; const { data, error } = await sb.rpc('add_admin', { p_email: f.email.value.trim(), p_role: f.role.value }); if (error) return toast(error.message, 1);
+  toast(data === 'invited' ? 'Saved. Now send the invite from Supabase → Authentication → Users → Invite user' : 'Admin added'); f.reset(); loadAll(); };
+function renderInvites() { const el = $('#inviteRows'); if (!el) return;
+  el.innerHTML = invites.map(i => `<div class="bg-white rounded-xl border border-outline-variant/40 p-3 flex items-center gap-3 text-sm"><span class="material-symbols-outlined text-primary">mail</span><span class="flex-1">${esc(i.email)} <span class="text-xs text-on-surface-variant">· ${esc(i.role)}</span></span><button data-uninv="${esc(i.email)}" class="text-error font-medium">Cancel</button></div>`).join('') || '<p class="text-sm text-on-surface-variant">No pending invites.</p>'; }
+$('#inviteRows').onclick = async e => { const em = e.target.dataset.uninv; if (!em) return; const { error } = await sb.from('admin_invites').delete().eq('email', em); if (error) return toast(error.message, 1); loadAll(); };
 
 boot();
