@@ -257,25 +257,45 @@ function fillSubs(sel) { const f = $('#vform'), c = f.category.value; f.subcateg
   f.subcategory.innerHTML = `<option value="">${c ? 'Select subcategory' : 'Select category first'}</option>` + subsOf(c).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); f.subcategory.value = sel || ''; }
 $('#vform').category.onchange = () => { fillSubs(); updateBothHint(); };
 
-let aiFrame = null, aiSeq = 0, lastAi = null, editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null, newBlobUrl = null;
+let aiFrame = null, aiSeq = 0, lastAi = null, lastAiTitle = null, editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null, newBlobUrl = null;
+// Turn a failed function call into a readable reason
+async function aiReason(res) {
+  const e = res?.error, d = res?.data; if (d?.error) return d.error;
+  let msg = e?.message || String(e || '');
+  try { const j = await e?.context?.json?.(); if (j?.error) msg = j.error; else if (j?.message) msg = j.message; } catch { try { const t = await e?.context?.text?.(); if (t) msg = t.slice(0, 160); } catch { } }
+  const st = e?.context?.status;
+  if (st === 404 || /not found|FunctionsRelayError/i.test(msg)) return 'function "ai-describe" is not deployed (check the name in Supabase → Edge Functions)';
+  if (/Failed to send a request|FunctionsFetchError|Failed to fetch/i.test(msg)) return 'could not reach the ai-describe function (not deployed, or blocked)';
+  if (st === 401) return 'not signed in / session expired — log in again';
+  return msg.replace(/^Edge Function returned a non-2xx status code$/, `server error ${st || ''}`).slice(0, 200);
+}
 // ---- AI suggestions (description + tags) via the ai-describe server function (Groq) ----
 async function aiSuggest(force) {
   const f = $('#vform'), stat = $('#aiStat'), btn = $('#aiBtn');
   const untouched = lastAi && f.description.value === lastAi.d && f.tags.value === lastAi.t;   // still exactly what AI wrote
   if (!force && !untouched && (f.description.value.trim() || f.tags.value.trim())) return;       // never overwrite what the user typed
-  const title = f.title.value.trim(); if (!title && !aiFrame) { stat.textContent = 'Add a title or a video first'; return; }
+  const title = f.title.value.trim(); if (!title) { stat.textContent = force ? 'Add a title first' : ''; return; }
+  if (!force && title === lastAiTitle && untouched) return;                 // already done for this title
   const my = ++aiSeq; btn.disabled = true; stat.innerHTML = '<span class="inline-block w-3 h-3 mr-1 align-[-1px] rounded-full border-2 border-primary/30 border-t-primary animate-spin"></span>Writing description & tags…';
-  const sel = x => x.value ? x.options[x.selectedIndex]?.text : '';
-  let res; try { res = await sb.functions.invoke('ai-describe', { body: { title, category: sel(f.category), subcategory: sel(f.subcategory), image: aiFrame || '' } }); } catch (e) { res = { error: e }; }
+  const body = { title };
+  let res, why = '';
+  for (let attempt = 0; attempt < 2; attempt++) {                       // one automatic retry
+    try { res = await sb.functions.invoke('ai-describe', { body }); } catch (e) { res = { error: e }; }
+    if (!res?.error && res?.data && !res.data.error) break;
+    why = await aiReason(res); if (/not deployed|GROQ_API_KEY|Invalid API Key|Not allowed/i.test(why)) break;
+    await new Promise(r => setTimeout(r, 1200));
+  }
   if (my !== aiSeq) return; btn.disabled = false;
-  const d = res?.data; if (res?.error || !d || d.error) { stat.textContent = 'AI suggestions unavailable right now'; return; }
+  const d = res?.data; if (res?.error || !d || d.error) { stat.innerHTML = `<span class="text-error">AI unavailable:</span> ${esc(why || 'unknown error')}`; stat.title = why; console.warn('[ai-describe]', why, res); return; }
   const ow = force || (lastAi && f.description.value === lastAi.d && f.tags.value === lastAi.t);
   if (ow || !f.description.value.trim()) f.description.value = d.description || f.description.value;
   if (ow || !f.tags.value.trim()) f.tags.value = (d.tags || []).join(', ');
-  lastAi = { d: f.description.value, t: f.tags.value };
+  lastAi = { d: f.description.value, t: f.tags.value }; lastAiTitle = title;
   stat.textContent = '✓ Suggested — edit if needed'; [f.description, f.tags].forEach(el => { el.classList.add('ring-2', 'ring-primary/40'); setTimeout(() => el.classList.remove('ring-2', 'ring-primary/40'), 1500); });
 }
 $('#aiBtn').onclick = () => aiSuggest(true);
+// When the title is changed by hand, refresh the AI text (only if the user hasn't edited it)
+$('#vform').title.addEventListener('change', () => { if ($('#vform').title.value.trim() !== lastAiTitle) aiSuggest(false); });
 // ---- File box: empty state ↔ chosen file ----
 function showPicked(src, name, meta) {
   const vid = $('#vprev'); vid.pause(); if (src) vid.src = src; else vid.removeAttribute('src');
@@ -347,7 +367,7 @@ async function backfillHashes() {
 const BTN = (mode, label, cls) => `<button ${mode ? `data-mode="${mode}"` : 'type="button" data-close'} class="px-4 py-2.5 rounded-lg ${cls}">${label}</button>`;
 function openVideo(v) {
   if (v && !isSuper()) return;
-  editing = v || null; thumbBlob = null; aiFrame = null; lastAi = null; aiSeq++; $('#aiStat').textContent = ''; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
+  editing = v || null; thumbBlob = null; aiFrame = null; lastAi = null; lastAiTitle = null; aiSeq++; $('#aiStat').textContent = ''; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
   showPicked(null); $('#progress').classList.add('hidden'); f.category.value = '';
   const n = $('#vnote'); n.classList.toggle('hidden', isSuper()); n.textContent = 'Your video will be sent to a superadmin for review. It appears on the website only after approval.';
   $('#vbtns').innerHTML = isSuper()
@@ -386,6 +406,7 @@ $('#vform').vfile.onchange = e => {
   newBlobUrl = URL.createObjectURL(file); showPicked(newBlobUrl, file.name, 'Analysing…');
   fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); updateBothHint(); }).catch(() => { dupState = 'ok'; });
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  aiSuggest(false);                                                         // description + tags from the title
   vid.onloadedmetadata = async () => {
     f.duration_seconds.value = Math.round(vid.duration); const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h);
     f.resolution.value = big >= 3000 ? '4K' : big >= 1800 ? '1080p' : '720p'; f.orientation.value = w > h ? 'horizontal' : w < h ? 'vertical' : 'square';
@@ -393,8 +414,6 @@ $('#vform').vfile.onchange = e => {
     vid.onseeked = () => {
       const cv = document.createElement('canvas'); const sc = Math.min(1, 1280 / vid.videoWidth); cv.width = vid.videoWidth * sc; cv.height = vid.videoHeight * sc;
       cv.getContext('2d').drawImage(vid, 0, 0, cv.width, cv.height); cv.toBlob(b => { thumbBlob = b; }, 'image/jpeg', 0.82); vid.onseeked = null;
-      const ac = document.createElement('canvas'), as = Math.min(1, 768 / vid.videoWidth); ac.width = vid.videoWidth * as; ac.height = vid.videoHeight * as;
-      ac.getContext('2d').drawImage(vid, 0, 0, ac.width, ac.height); aiFrame = ac.toDataURL('image/jpeg', 0.7); aiSuggest(false);
     };
     vid.currentTime = Math.min(1, vid.duration / 3);
     $('#vmeta').textContent = `${f.resolution.value} · ${dur(+f.duration_seconds.value)}`;
