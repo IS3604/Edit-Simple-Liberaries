@@ -88,6 +88,8 @@
 <section id="t-team" class="hidden">
 <div class="mb-6"><h1 class="text-2xl font-bold">Team</h1><p class="text-on-surface-variant">Invite people and manage who can do what.</p></div>
 <div id="teamStats" class="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6"></div>
+<div id="statusWrap" class="hidden mb-8"><div class="flex items-center justify-between mb-3"><h2 class="font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-primary">monitoring</span>Member status</h2><span class="text-xs text-on-surface-variant">Only visible to you</span></div>
+<div class="bg-white rounded-xl border border-outline-variant/40 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Member</th><th class="p-3">Role</th><th class="p-3">Account</th><th class="p-3">Last sign-in</th><th class="p-3 text-right">Uploads</th><th class="p-3 text-right">Live</th><th class="p-3 text-right">Pending</th><th class="p-3 text-right">Rejected</th><th class="p-3">Last upload</th></tr></thead><tbody id="statusRows"></tbody></table></div></div>
 <div class="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
 <div><h2 class="font-semibold mb-3">Members</h2><div id="teamRows" class="grid gap-3 2xl:grid-cols-2"></div>
 <h2 class="font-semibold mt-8 mb-3">Pending invites</h2><div id="inviteRows" class="space-y-2"></div></div>

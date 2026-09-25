@@ -12,7 +12,7 @@ const dur = s => `${Math.floor((s || 0) / 60)}:${String((s || 0) % 60).padStart(
 const skRows = (n, cols) => Array.from({ length: n }, () => `<tr>${Array.from({ length: cols }, (_, i) => `<td class="p-3"><div class="sk h-${i ? 4 : 12} ${i ? 'w-20' : 'w-48'}"></div></td>`).join('')}</tr>`).join('');
 const skCards = (n, h = 28) => Array.from({ length: n }, () => `<div class="sk h-${h} !rounded-xl"></div>`).join('');
 
-let topLevel = false, me = null, role = null, cats = [], videos = [], reqs = [], team = [], invites = [];
+let topLevel = false, myTitle = null, status = [], me = null, role = null, cats = [], videos = [], reqs = [], team = [], invites = [];
 const isSuper = () => role === 'superadmin';
 
 // ---------------- AUTH ----------------
@@ -61,9 +61,9 @@ async function boot(skipLink) {
   if (!skipLink && (linkType === 'invite' || linkType === 'recovery' || (['magiclink', 'signup', 'email'].includes(linkType) && !me.user_metadata?.password_set))) return askPassword(me, linkType);
   const { data: r } = await sb.rpc('my_role');
   if (!r) { await sb.auth.signOut(); $('#loginErr').textContent = 'This account has no admin access yet. Ask a superadmin to add you in Team.'; return show('login'); }
-  role = lvl(r); topLevel = !!(await sb.rpc('can_manage_all')).data;
+  role = lvl(r); topLevel = !!(await sb.rpc('can_manage_all')).data; myTitle = (await sb.rpc('my_title')).data || null;
   $('#meEmail').textContent = me.email;
-  $('#meRole').textContent = role; $('#meRole').className += isSuper() ? ' bg-primary text-on-primary' : ' bg-surface-container text-on-surface-variant';
+  $('#meRole').textContent = myTitle || role; $('#meRole').className += isSuper() ? ' bg-primary text-on-primary' : ' bg-surface-container text-on-surface-variant';
   buildTabs(); show('app');
   paintSkeletons(); tab(location.hash.slice(1) || 'dash');
   await loadAll(); live(); setTimeout(backfillHashes, 1500);
@@ -124,6 +124,7 @@ async function loadAll() {
   for (const [n, x] of [['Categories', c], ['Videos', v], ['Requests', r], ['Team', a]]) if (x.error) toast(`${n}: ${x.error.message}${/does not exist|column/.test(x.error.message) ? ' — run roles.sql' : ''}`, 1);
   const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && lvl(myNew) !== role) { location.reload(); return; }
   cats = c.data || []; videos = await signVideos(v.data || []); reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
+  status = topLevel ? ((await sb.rpc('team_status')).data || []) : [];
   renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites();
 }
 // roles above 'admin' are all shown as superadmin
@@ -531,8 +532,18 @@ $('#cform').onsubmit = async e => {
 };
 
 // ---------------- TEAM (superadmin) ----------------
+function renderStatus() {
+  $('#statusWrap').classList.toggle('hidden', !topLevel || !status.length); if (!topLevel) return;
+  const acc = a => ({ Active: 'bg-green-100 text-green-800', 'Invite not accepted': 'bg-amber-100 text-amber-800' }[a] || 'bg-red-100 text-red-800');
+  $('#statusRows').innerHTML = status.map(m => `<tr class="border-b border-outline-variant/30 last:border-0">
+    <td class="p-3"><div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full bg-surface-container grid place-items-center text-xs font-bold">${initials(m.email)}</span><span class="font-medium">${esc(m.email)}</span>${m.user_id === me.id ? '<span class="text-xs text-on-surface-variant">(you)</span>' : ''}</div></td>
+    <td class="p-3 whitespace-nowrap">${esc(m.role_label)}</td><td class="p-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${acc(m.account)}">${esc(m.account)}</span></td>
+    <td class="p-3 whitespace-nowrap text-on-surface-variant">${m.last_sign_in ? ago(m.last_sign_in) : '—'}</td>
+    <td class="p-3 text-right">${m.uploads}</td><td class="p-3 text-right text-green-700">${m.live}</td><td class="p-3 text-right text-amber-700">${m.pending}</td><td class="p-3 text-right text-red-700">${m.rejected}</td>
+    <td class="p-3 whitespace-nowrap text-on-surface-variant">${m.last_upload ? ago(m.last_upload) : '—'}</td></tr>`).join('');
+}
 function renderTeam() {
-  if (!isSuper()) return;
+  if (!isSuper()) return; renderStatus();
   const st = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${i}</span></span><div><p class="text-2xl font-bold leading-none">${n}</p><p class="text-xs text-on-surface-variant mt-1">${l}</p></div></div>`;
   $('#teamStats').innerHTML = st('groups', team.length, 'Members') + st('shield_person', team.filter(t => lvl(t.role) === 'superadmin').length, 'Superadmins') + st('person', team.filter(t => t.role === 'admin').length, 'Admins') + st('mail', invites.length, 'Pending invites');
   const sorted = [...team].sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || (lvl(a.role) === lvl(b.role) ? 0 : lvl(a.role) === 'superadmin' ? -1 : 1));
@@ -540,7 +551,7 @@ function renderTeam() {
     return `<div class="bg-white rounded-2xl border border-outline-variant/40 p-4">
     <div class="flex items-center gap-3"><span class="w-11 h-11 rounded-full grid place-items-center font-bold text-sm ${sup ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface'}">${initials(t.email)}</span>
     <div class="flex-1 min-w-0"><p class="font-semibold truncate">${esc(t.email || t.user_id)}</p><p class="text-xs text-on-surface-variant">${you ? 'You · ' : ''}${up.length} uploads · ${up.filter(isLive).length} live</p></div>
-    <span class="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${sup ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-surface-container text-on-surface-variant'}">${sup ? 'Superadmin' : 'Admin'}</span></div>
+    <span class="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${sup ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-surface-container text-on-surface-variant'}">${you && myTitle ? esc(myTitle) : sup ? 'Superadmin' : 'Admin'}</span></div>
     ${locked ? `<p class="flex items-center gap-1.5 mt-4 pt-3 border-t border-outline-variant/40 text-xs text-on-surface-variant"><span class="material-symbols-outlined !text-base">lock</span>Protected — superadmins can't change other superadmins.</p>` : ''}
     ${you || locked ? '' : `<div class="flex items-center gap-2 mt-4 pt-3 border-t border-outline-variant/40"><select data-role="${t.user_id}" aria-label="Role" class="flex-1 rounded-lg border-outline-variant text-sm py-1.5 focus:ring-primary"><option value="admin" ${!sup ? 'selected' : ''}>Admin</option><option value="superadmin" ${sup ? 'selected' : ''}>Superadmin</option></select>
     <button data-rm="${t.user_id}" data-em="${esc(t.email)}" class="px-3 py-1.5 rounded-lg text-sm text-error font-medium hover:bg-red-50 flex items-center gap-1"><span class="material-symbols-outlined !text-base">person_remove</span>Remove</button></div>`}</div>`; }).join('');

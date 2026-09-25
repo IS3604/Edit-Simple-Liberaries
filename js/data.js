@@ -74,7 +74,7 @@ async function counts(){const s=await client();const m={};
   else SAMPLE.forEach(v=>m[v.category]=(m[v.category]||0)+1);return m;}
 async function loadCats(){const s=await client();if(!s)return;const {data,error}=await s.from('categories').select('slug,name,parent_slug,icon,blurb,sort').order('sort');if(error||!data?.length)return;
   const main=data.filter(c=>!c.parent_slug);CATS.length=0;main.forEach(m=>CATS.push({slug:m.slug,name:m.name,icon:m.icon||'movie',blurb:m.blurb||'',subs:data.filter(c=>c.parent_slug===m.slug).map(c=>[c.slug,c.name])}));}
-const ready=gate().then(()=>loadCats()).catch(e=>console.error(e));
+const ready=gate().then(()=>loadCats()).then(()=>document.documentElement.classList.remove('auth-wait')).catch(e=>console.error(e));
 // Live updates: re-render when videos/categories change (realtime + tab focus + 60s safety poll)
 const subs=[];let lt=null,ch=null;
 async function fire(){cache.clear();try{await loadCats()}catch{};subs.forEach(f=>{try{f()}catch(e){console.error(e)}})}

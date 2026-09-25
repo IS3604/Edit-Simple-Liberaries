@@ -61,7 +61,7 @@ window.esShowLogin=msg=>{
   <div class="stagger"><button class="relative w-full bg-primary text-on-primary rounded-xl py-3 font-semibold hover:brightness-95 active:scale-[.98] transition"><span class="lbl">Log in</span><span class="spin hidden absolute inset-0 grid place-items-center"><span class="spinner"></span></span></button>
   <p class="err text-sm text-error mt-3 text-center min-h-[20px]">${esc(msg||'')}</p><a href="admin.html" class="block text-center text-sm text-primary font-medium hover:underline">Forgot password?</a></div></form>
   <div class="ok hidden login-card bg-white/90 backdrop-blur rounded-3xl p-10 shadow-2xl text-center"><svg class="check mx-auto" viewBox="0 0 52 52" width="72" height="72"><circle cx="26" cy="26" r="24" fill="none" stroke="#16a34a" stroke-width="3"/><path fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27l7 7 15-15"/></svg><p class="text-xl font-bold mt-4">Signed in</p><p class="text-sm text-on-surface-variant">Loading the library…</p></div></div>`;
-  document.body.appendChild(d);document.documentElement.style.overflow='hidden';
+  document.body.appendChild(d);document.documentElement.style.overflow='hidden';document.documentElement.classList.add('login-open');
   const f=d.querySelector('form'),b=f.querySelector('button'),err=f.querySelector('.err');f.email.focus();
   f.onsubmit=async e=>{e.preventDefault();err.textContent='';b.disabled=true;b.querySelector('.lbl').classList.add('invisible');b.querySelector('.spin').classList.remove('hidden');
     const m=await ES.login(f.email.value.trim(),f.password.value);
