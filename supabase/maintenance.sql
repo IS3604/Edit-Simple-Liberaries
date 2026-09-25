@@ -12,3 +12,9 @@ drop policy if exists "settings readable" on public.site_settings;
 create policy "settings readable" on public.site_settings for select to anon, authenticated using (true);
 -- No insert/update/delete policies: only the Supabase dashboard (owner) can flip the switch.
 revoke insert, update, delete on public.site_settings from anon, authenticated;
+-- Instant on/off: broadcast changes to open pages via Realtime
+do $$ begin
+  if exists (select 1 from pg_publication where pubname='supabase_realtime')
+     and not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='site_settings')
+  then execute 'alter publication supabase_realtime add table public.site_settings'; end if;
+end $$;

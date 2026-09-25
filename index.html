@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><script>document.documentElement.classList.add("auth-wait")</script><style>html.auth-wait body>*:not(#es-login){visibility:hidden!important}html.auth-wait body::after{content:"";position:fixed;top:50%;left:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #ffe4cc;border-top-color:#f07f2e;animation:awspin .7s linear infinite}@keyframes awspin{to{transform:rotate(360deg)}}html.auth-wait.login-open body::after{display:none}</style><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Edit Simple Libraries — Stock Videos for Lawyers & Doctors</title><meta name="description" content="Royalty-free stock videos for lawyers, doctors and professional practices."><meta name="theme-color" content="#ffe4cc">
 <link rel="icon" href="logo.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preconnect" href="https://ddiwrhpaankvxnbjbbxl.supabase.co" crossorigin><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://ddiwrhpaankvxnbjbbxl.supabase.co" crossorigin><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://loremflickr.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,400,0..1&display=block">
 <link rel="stylesheet" href="css/site.css"></head>
@@ -33,12 +33,14 @@ const f=document.getElementById('hero-search'),cats=document.getElementById('cat
 latest.innerHTML=esSkel(6);
 const catSkel=`<div class="rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40"><div class="sk aspect-[16/10] !rounded-none"></div><div class="p-5"><div class="sk h-3 w-full mb-1"></div><div class="sk h-3 w-2/3 mb-4"></div><div class="flex gap-2"><div class="sk h-7 w-20"></div><div class="sk h-7 w-24"></div><div class="sk h-7 w-16"></div></div></div></div>`;
 const G={lawyers:'from-orange-400 via-amber-500 to-orange-700',doctors:'from-rose-300 via-orange-400 to-amber-600',both:'from-amber-300 via-orange-400 to-rose-500'};
-const mosaic=(c,th)=>{const t=th.filter(v=>v.thumbnail_url).slice(0,3);
- if(!t.length)return `<span class="material-symbols-outlined absolute right-5 top-4 text-white/25 !text-[120px] leading-none" aria-hidden="true">${c.icon}</span>`;
- const img=(v,cl)=>`<img src="${esEsc(v.thumbnail_url)}" alt="" loading="lazy" decoding="async" class="${cl} w-full h-full object-cover">`;
- return t.length<3?img(t[0],'absolute inset-0'):`<div class="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-0.5">${img(t[0],'col-span-2 row-span-2')}${img(t[1],'')}${img(t[2],'')}</div>`};
-const card=(c,n,th)=>`<article class="cat-card group flex flex-col rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-primary/40 transition-all duration-300">
- <a href="videos.html?cat=${c.slug}" class="cat-media relative block aspect-[16/10] bg-gradient-to-br ${G[c.slug]||G.both} overflow-hidden" aria-label="Browse ${esEsc(c.name)}">${mosaic(c,th)}
+// Random topic photos from the internet (loremflickr, keyword search). Falls back to gradient + icon if offline.
+const KW={lawyers:['lawyer,law','courtroom,judge','gavel,justice','contract,signing','law,library'],doctors:['doctor,hospital','surgery,surgeon','nurse,patient','stethoscope,medical','laboratory,science'],both:['office,meeting','business,handshake','interview,camera','teamwork,office','professional,portrait']};
+const kws=c=>{const k=KW[c.slug]||[c.name.replace(/^For /,''),...c.subs.map(s=>s[1])].map(x=>String(x).toLowerCase().replace(/[^a-z ]/g,'').trim().split(/\s+/).slice(0,2).join(','));return [...k].sort(()=>Math.random()-.5)};
+const pic=(k,w,h,cl)=>`<img src="https://loremflickr.com/${w}/${h}/${encodeURIComponent(k).replace(/%2C/g,',')}?lock=${1+Math.floor(Math.random()*9999)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.style.opacity=1" onerror="this.remove()" style="opacity:0;transition:opacity .6s" class="${cl} w-full h-full object-cover">`;
+const mosaic=c=>{const k=kws(c);
+ return `<span class="material-symbols-outlined absolute right-5 top-4 text-white/25 !text-[120px] leading-none" aria-hidden="true">${c.icon}</span><div class="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-0.5">${pic(k[0],640,400,'col-span-2 row-span-2')}${pic(k[1]||k[0],320,200,'')}${pic(k[2]||k[0],320,200,'')}</div>`};
+const card=(c,n)=>`<article class="cat-card group flex flex-col rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-primary/40 transition-all duration-300">
+ <a href="videos.html?cat=${c.slug}" class="cat-media relative block aspect-[16/10] bg-gradient-to-br ${G[c.slug]||G.both} overflow-hidden" aria-label="Browse ${esEsc(c.name)}">${mosaic(c)}
   <span class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent"></span>
   <span class="absolute top-3 right-3 text-[11px] font-bold bg-white/95 text-on-surface px-2.5 py-1 rounded-full shadow">${n} video${n===1?'':'s'}</span>
   <span class="absolute left-4 right-4 bottom-4 flex items-center gap-3 text-white"><span class="w-11 h-11 shrink-0 rounded-2xl bg-white/20 backdrop-blur grid place-items-center ring-1 ring-white/40"><span class="material-symbols-outlined">${c.icon}</span></span><span class="text-xl sm:text-2xl font-bold font-display leading-tight drop-shadow">${esEsc(c.name)}</span></span></a>
@@ -50,8 +52,8 @@ cats.innerHTML=catSkel.repeat(3);
 f.onsubmit=e=>{e.preventDefault();const p=new URLSearchParams();if(f.cat.value)p.set('cat',f.cat.value);if(f.q.value.trim())p.set('q',f.q.value.trim());location.href='videos.html?'+p};
 const render=async()=>{
  f.cat.innerHTML='<option value="">All categories</option>'+ES.CATS.map(c=>`<option value="${c.slug}">${esEsc(c.name)}</option>`).join('');
- const [n,vids,...th]=await Promise.all([ES.counts(),ES.listVideos({limit:6}),...ES.CATS.map(c=>ES.listVideos({category:c.slug,limit:3}))]);
- cats.innerHTML=ES.CATS.map((c,i)=>card(c,n[c.slug]||0,th[i]||[])).join('');
+ const [n,vids]=await Promise.all([ES.counts(),ES.listVideos({limit:6})]);
+ const sig=JSON.stringify([ES.CATS,n]);if(sig!==cats.dataset.sig){cats.dataset.sig=sig;cats.innerHTML=ES.CATS.map(c=>card(c,n[c.slug]||0)).join('')}   // re-render only on real change, so photos don't flicker on live updates
  latest.innerHTML=vids.length?vids.map(esCard).join(''):'<p class="col-span-full text-center text-on-surface-variant py-12">New videos coming soon.</p>';esHoverPlay(latest);
 };
 ES.ready.then(render);ES.onChange(render);

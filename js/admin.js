@@ -160,7 +160,7 @@ function renderDash() {
   const stat = (i, n, l, tabk) => `<button ${tabk ? `data-go="${tabk}"` : ''} class="text-left bg-white rounded-xl border border-outline-variant/40 p-5 hover:border-primary/50 transition"><span class="material-symbols-outlined text-primary">${i}</span><p class="text-3xl font-bold mt-2">${n}</p><p class="text-sm text-on-surface-variant">${l}</p></button>`;
   const mine = videos.filter(v => v.submitted_by === me.id);
   $('#stats').innerHTML = isSuper()
-    ? stat('movie', videos.length, 'Total videos', 'videos:') + stat('public', live, 'Live on website', 'videos:live') + stat('hourglass_top', pend, 'Waiting for approval', 'videos:pending') + stat('content_copy', videos.filter(v => dupSet().has(v.file_hash)).length, 'Duplicate videos', 'videos:dup')
+    ? stat('movie', videos.length, 'Total videos', 'videos:') + stat('public', live, 'Live on website', 'videos:live') + stat('hourglass_top', pend, 'Waiting for approval', 'videos:pending') + stat('content_copy', dupCopies().size, 'Duplicate videos', 'videos:dup')
     : stat('upload', mine.length, 'My uploads', 'requests') + stat('hourglass_top', mine.filter(v => v.status === 'pending').length, 'Waiting for review', 'requests') + stat('public', mine.filter(isLive).length, 'Approved & live', 'requests') + stat('block', mine.filter(v => v.status === 'rejected').length, 'Rejected', 'requests');
   $$('[data-go]').forEach(b => b.onclick = () => tab(b.dataset.go));
   $('#dashNote').innerHTML = isSuper()
@@ -181,15 +181,18 @@ function statusChip(v) {
 }
 function canDirect(v) { return isSuper(); }
 const dupSet = () => { const n = {}; videos.forEach(v => v.file_hash && (n[v.file_hash] = (n[v.file_hash] || 0) + 1)); return new Set(Object.keys(n).filter(h => n[h] > 1)); };
+// First upload of each file = the Original; only later uploads are "duplicates"
+const originals = () => { const o = {}; videos.forEach(v => { if (!v.file_hash) return; const c = o[v.file_hash]; if (!c || new Date(v.created_at) - new Date(c.created_at) < 0 || (v.created_at === c.created_at && v.id < c.id)) o[v.file_hash] = v; }); return o; };
+const dupCopies = () => { const d = dupSet(), o = originals(); return new Set(videos.filter(v => d.has(v.file_hash) && o[v.file_hash].id !== v.id).map(v => v.id)); };
 function renderVideos() {
-  const q = $('#vq').value.toLowerCase().trim(), c = $('#vcat').value, s = $('#vstat').value, dups = dupSet();
+  const q = $('#vq').value.toLowerCase().trim(), c = $('#vcat').value, s = $('#vstat').value, dups = dupSet(), copies = dupCopies();
   const list = videos.filter(v => (!q || (v.search_text || (v.title + ' ' + (v.tags || []).join(' '))).toLowerCase().includes(q)) && (!c || v.category === c || v.subcategory === c) &&
     (!s || (s === 'live' && isLive(v)) || (s === 'draft' && v.status === 'approved' && !v.published) || s === v.status || (s === 'mine' && v.submitted_by === me.id) || (s === 'dup' && dups.has(v.file_hash))));
   // Duplicates view: group each file together — Original (first upload) then its variants in upload order
   const grp = {};
   if (s === 'dup') {
     const first = {}; list.forEach(v => { const t = +new Date(v.created_at); if (!(v.file_hash in first) || t < first[v.file_hash]) first[v.file_hash] = t; });
-    list.sort((a, b) => first[a.file_hash] - first[b.file_hash] || String(a.file_hash).localeCompare(String(b.file_hash)) || new Date(a.created_at) - new Date(b.created_at));
+    list.sort((a, b) => first[a.file_hash] - first[b.file_hash] || String(a.file_hash).localeCompare(String(b.file_hash)) || new Date(a.created_at) - new Date(b.created_at) || (a.id < b.id ? -1 : 1));
     list.forEach(v => (grp[v.file_hash] = grp[v.file_hash] || []).push(v));
   }
   const cols = isSuper() ? 5 : 4;
@@ -200,7 +203,7 @@ function renderVideos() {
   $('#vempty').classList.toggle('hidden', list.length > 0);
   $('#vrows').innerHTML = list.map(v => groupHead(v) + `<tr data-vrow="${v.id}" class="${grp[v.file_hash] && grp[v.file_hash][0] !== v ? 'dupvar ' : ''}border-b border-outline-variant/30 last:border-0 align-top">
     <td class="p-3"><div class="flex items-center gap-3"><button data-play="${v.id}" class="relative w-24 aspect-video rounded-md bg-surface-container overflow-hidden shrink-0" aria-label="Preview">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" loading="lazy" class="w-full h-full object-cover" alt="">` : ''}<span class="material-symbols-outlined absolute inset-0 m-auto h-fit w-fit text-white drop-shadow !text-xl">play_circle</span></button>
-      <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${role_(v)}${esc(v.title)}</p>${dups.has(v.file_hash) && s !== 'dup' ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded mt-0.5"><span class="material-symbols-outlined !text-xs">content_copy</span>Duplicate</span>' : ''}<p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
+      <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${role_(v)}${esc(v.title)}</p>${copies.has(v.id) && s !== 'dup' ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded mt-0.5"><span class="material-symbols-outlined !text-xs">content_copy</span>Duplicate</span>' : ''}<p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
     <td class="p-3 whitespace-nowrap">${esc(cname(v.category))}<br><span class="text-xs text-on-surface-variant">${esc(cname(v.subcategory))}</span></td>
     <td class="p-3 whitespace-nowrap text-xs">${esc(v.resolution)} · ${v.fps}fps<br>${dur(v.duration_seconds)} · ${esc(v.orientation)}</td>
     <td class="p-3">${statusChip(v)}</td>
