@@ -35,6 +35,6 @@ Deno.serve(async (req) => {
     }
     return json({ status: "sent" });
   } catch (err) {
-    return json({ error: String(err?.message ?? err) }, 500);
+    return json({ error: String((err as Error)?.message ?? err) }, 500);
   }
 });

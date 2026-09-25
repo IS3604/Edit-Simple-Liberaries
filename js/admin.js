@@ -66,7 +66,7 @@ async function boot(skipLink) {
   $('#meEmail').textContent = me.email;
   $('#meRole').textContent = myTitle || role; $('#meRole').className += isSuper() ? ' bg-primary text-on-primary' : ' bg-surface-container text-on-surface-variant';
   buildTabs(); show('app');
-  paintSkeletons(); tab(location.hash.slice(1) || 'dash');
+  paintSkeletons(); tab(location.hash.slice(1));
   await loadAll(); live(); setTimeout(backfillHashes, 1500);
 }
 // ---------------- LIVE UPDATES ----------------
@@ -103,14 +103,16 @@ $('#logout').onclick = logout; $('#logoutM').onclick = logout;
 
 // ---------------- TABS ----------------
 function buildTabs() {
-  const t = [['dash', 'dashboard', 'Dashboard'], ['videos', 'movie', 'Videos'],
-    isSuper() ? ['review', 'fact_check', 'Review'] : ['requests', 'pending_actions', 'My requests'],
-    ...(isSuper() ? [['cats', 'category', 'Categories'], ['team', 'group', 'Team']] : [])];
+  const t = isSuper()
+    ? [['dash', 'dashboard', 'Dashboard'], ['videos', 'movie', 'Videos'], ['cats', 'category', 'Categories'], ['team', 'group', 'Team']]
+    : [['videos', 'movie', 'Videos'], ['requests', 'pending_actions', 'My requests'], ['guide', 'menu_book', 'Upload guide']];
   $('#tabs').innerHTML = t.map(([k, i, l]) => `<button data-tab="${k}" class="tab flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"><span class="material-symbols-outlined">${i}</span><span class="hidden sm:inline">${l}</span><span data-badge="${k}" class="hidden ml-auto text-[11px] font-bold bg-error text-white rounded-full px-1.5 min-w-[20px] text-center"></span></button>`).join('');
   $$('.tab').forEach(b => b.onclick = () => tab(b.dataset.tab));
 }
 function tab(t) {
-  if (!$('#t-' + t) || !$(`.tab[data-tab="${t}"]`)) t = 'dash'; history.replaceState(null, '', '#' + t);
+  let [name, filter] = String(t || '').split(':'); t = name;
+  if (!$('#t-' + t) || !$(`.tab[data-tab="${t}"]`)) t = $('.tab')?.dataset.tab || 'videos'; history.replaceState(null, '', '#' + t);
+  if (t === 'videos' && filter !== undefined) { $('#vstat').value = filter; renderVideos(); }
   $$('main > section').forEach(s => s.classList.toggle('hidden', s.id !== 't-' + t));
   $$('.tab').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('bg-primary', on); b.classList.toggle('text-on-primary', on); b.classList.toggle('hover:bg-surface-container', !on); });
 }
@@ -119,7 +121,6 @@ function badge(k, n) { const b = $(`[data-badge="${k}"]`); if (!b) return; b.tex
 function paintSkeletons() {
   $('#stats').innerHTML = skCards(4); $('#bySub').innerHTML = skCards(3, 40);
   $('#vrows').innerHTML = skRows(5, 5); $('#catList').innerHTML = skCards(3, 64);
-  if ($('#rvList')) { $('#rvList').innerHTML = skCards(2, 64); $('#rcList').innerHTML = skCards(2, 16); }
   $('#myReq').innerHTML = skCards(3, 16); $('#teamRows').innerHTML = skRows(3, 3);
 }
 
@@ -134,7 +135,7 @@ async function loadAll() {
   const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && lvl(myNew) !== role) { location.reload(); return; }
   cats = c.data || []; videos = await signVideos(v.data || []); reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
   status = topLevel ? ((await sb.rpc('team_status')).data || []) : [];
-  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites();
+  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderGuide(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites();
 }
 // roles above 'admin' are all shown as superadmin
 const lvl = r => r === 'admin' ? 'admin' : r ? 'superadmin' : null;
@@ -158,16 +159,16 @@ function renderDash() {
   const stat = (i, n, l, tabk) => `<button ${tabk ? `data-go="${tabk}"` : ''} class="text-left bg-white rounded-xl border border-outline-variant/40 p-5 hover:border-primary/50 transition"><span class="material-symbols-outlined text-primary">${i}</span><p class="text-3xl font-bold mt-2">${n}</p><p class="text-sm text-on-surface-variant">${l}</p></button>`;
   const mine = videos.filter(v => v.submitted_by === me.id);
   $('#stats').innerHTML = isSuper()
-    ? stat('movie', videos.length, 'Total videos', 'videos') + stat('public', live, 'Live on website', 'videos') + stat('hourglass_top', pend, 'Videos awaiting review', 'review') + stat('edit_note', preq, 'Pending changes', 'review')
+    ? stat('movie', videos.length, 'Total videos', 'videos:') + stat('public', live, 'Live on website', 'videos:live') + stat('hourglass_top', pend, 'Waiting for approval', 'videos:pending') + stat('content_copy', videos.filter(v => dupSet().has(v.file_hash)).length, 'Duplicate videos', 'videos:dup')
     : stat('upload', mine.length, 'My uploads', 'requests') + stat('hourglass_top', mine.filter(v => v.status === 'pending').length, 'Waiting for review', 'requests') + stat('public', mine.filter(isLive).length, 'Approved & live', 'requests') + stat('block', mine.filter(v => v.status === 'rejected').length, 'Rejected', 'requests');
   $$('[data-go]').forEach(b => b.onclick = () => tab(b.dataset.go));
   $('#dashNote').innerHTML = isSuper()
-    ? (pend + preq ? `<div class="rounded-xl bg-primary-fixed text-on-primary-fixed p-4 flex items-center gap-3"><span class="material-symbols-outlined">notifications_active</span><p class="flex-1 text-sm"><b>${pend + preq}</b> item(s) waiting for your review.</p><button data-go2 class="text-sm font-semibold underline">Open review</button></div>` : '')
+    ? (pend ? `<div class="rounded-xl bg-primary-fixed text-on-primary-fixed p-4 flex items-center gap-3"><span class="material-symbols-outlined">notifications_active</span><p class="flex-1 text-sm"><b>${pend}</b> video(s) waiting for your approval.</p><button data-go2 class="text-sm font-semibold underline">Show them</button></div>` : '')
     : `<div class="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant flex gap-3"><span class="material-symbols-outlined text-primary">info</span>You're an <b>&nbsp;admin&nbsp;</b>: upload videos with “Add video” — they go live only after a superadmin approves them.</div>`;
-  $('[data-go2]')?.addEventListener('click', () => tab('review'));
+  $('[data-go2]')?.addEventListener('click', () => tab('videos:pending'));
   $('#bySub').innerHTML = mains().map(m => `<div class="bg-white rounded-xl border border-outline-variant/40 p-5"><p class="font-semibold mb-3">${esc(m.name)} <span class="text-on-surface-variant font-normal">(${videos.filter(v => isLive(v) && v.category === m.slug).length})</span></p>
     ${subsOf(m.slug).map(s => { const n = videos.filter(v => isLive(v) && v.subcategory === s.slug).length; return `<div class="flex justify-between text-sm py-1"><span>${esc(s.name)}</span><span class="${n ? '' : 'text-error font-medium'}">${n}</span></div>`; }).join('')}</div>`).join('') || '<p class="text-on-surface-variant">No categories yet.</p>';
-  badge(isSuper() ? 'review' : 'requests', isSuper() ? pend + preq : reqs.filter(r => r.requested_by === me.id && r.status === 'pending').length + videos.filter(v => v.submitted_by === me.id && v.status === 'pending').length);
+  badge(isSuper() ? 'videos' : 'requests', isSuper() ? pend : videos.filter(v => v.submitted_by === me.id && v.status === 'pending').length);
 }
 
 // ---------------- VIDEOS ----------------
@@ -249,13 +250,40 @@ function fillCatSelects() {
   const cur = $('#vcat').value;
   $('#vcat').innerHTML = '<option value="">All categories</option>' + mains().map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>` + subsOf(m.slug).map(s => `<option value="${esc(s.slug)}">&nbsp;&nbsp;↳ ${esc(s.name)}</option>`).join('')).join('');
   $('#vcat').value = cur;
-  if ($('#vmodal').classList.contains('hidden')) $('#vform').category.innerHTML = opts;
+  if ($('#vmodal').classList.contains('hidden')) $('#vform').category.innerHTML = '<option value="">Select category</option>' + opts;
   $('#cform').parent_slug.innerHTML = '<option value="">— None (main category) —</option>' + opts;
 }
-function fillSubs(sel) { const f = $('#vform'); f.subcategory.innerHTML = subsOf(f.category.value).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); if (sel) f.subcategory.value = sel; }
+function fillSubs(sel) { const f = $('#vform'), c = f.category.value; f.subcategory.disabled = !c;
+  f.subcategory.innerHTML = `<option value="">${c ? 'Select subcategory' : 'Select category first'}</option>` + subsOf(c).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); f.subcategory.value = sel || ''; }
 $('#vform').category.onchange = () => { fillSubs(); updateBothHint(); };
 
-let editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null;
+let aiFrame = null, aiSeq = 0, lastAi = null, editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null, newBlobUrl = null;
+// ---- AI suggestions (description + tags) via the ai-describe server function (Groq) ----
+async function aiSuggest(force) {
+  const f = $('#vform'), stat = $('#aiStat'), btn = $('#aiBtn');
+  const untouched = lastAi && f.description.value === lastAi.d && f.tags.value === lastAi.t;   // still exactly what AI wrote
+  if (!force && !untouched && (f.description.value.trim() || f.tags.value.trim())) return;       // never overwrite what the user typed
+  const title = f.title.value.trim(); if (!title && !aiFrame) { stat.textContent = 'Add a title or a video first'; return; }
+  const my = ++aiSeq; btn.disabled = true; stat.innerHTML = '<span class="inline-block w-3 h-3 mr-1 align-[-1px] rounded-full border-2 border-primary/30 border-t-primary animate-spin"></span>Writing description & tags…';
+  const sel = x => x.value ? x.options[x.selectedIndex]?.text : '';
+  let res; try { res = await sb.functions.invoke('ai-describe', { body: { title, category: sel(f.category), subcategory: sel(f.subcategory), image: aiFrame || '' } }); } catch (e) { res = { error: e }; }
+  if (my !== aiSeq) return; btn.disabled = false;
+  const d = res?.data; if (res?.error || !d || d.error) { stat.textContent = 'AI suggestions unavailable right now'; return; }
+  const ow = force || (lastAi && f.description.value === lastAi.d && f.tags.value === lastAi.t);
+  if (ow || !f.description.value.trim()) f.description.value = d.description || f.description.value;
+  if (ow || !f.tags.value.trim()) f.tags.value = (d.tags || []).join(', ');
+  lastAi = { d: f.description.value, t: f.tags.value };
+  stat.textContent = '✓ Suggested — edit if needed'; [f.description, f.tags].forEach(el => { el.classList.add('ring-2', 'ring-primary/40'); setTimeout(() => el.classList.remove('ring-2', 'ring-primary/40'), 1500); });
+}
+$('#aiBtn').onclick = () => aiSuggest(true);
+// ---- File box: empty state ↔ chosen file ----
+function showPicked(src, name, meta) {
+  const vid = $('#vprev'); vid.pause(); if (src) vid.src = src; else vid.removeAttribute('src');
+  $('#vpick').classList.toggle('hidden', !!src); $('#vchosen').classList.toggle('hidden', !src);
+  $('#vname').textContent = name || ''; $('#vmeta').textContent = meta || '';
+}
+$('#vdrop').addEventListener('click', e => { if (e.target.closest('video') || e.target.closest('#vchosen') && !e.target.closest('#vchange')) return; $('#vform').vfile.click(); });
+$('#vchange').onclick = e => { e.stopPropagation(); $('#vform').vfile.click(); };
 // ---- Duplicate warning (same file already uploaded) ----
 const catLabel = v => `${cname(v.category)} › ${cname(v.subcategory)}`;
 const stLabel = v => ({ pending: ['Pending', 'bg-amber-100 text-amber-800'], rejected: ['Rejected', 'bg-red-100 text-red-800'], approved: v.published ? ['Live', 'bg-green-100 text-green-800'] : ['Hidden', 'bg-surface-container text-on-surface-variant'] }[v.status] || ['', '']);
@@ -263,16 +291,23 @@ async function checkDuplicate(h) {
   const { data } = await sb.from('videos').select('id,title,category,subcategory,status,published,thumbnail_url,video_url,created_at,submitted_by').eq('file_hash', h);
   const hits = (data || []).filter(v => v.id !== editing?.id);
   if (!hits.length) { dupState = 'ok'; return; }
-  const list = await signVideos(hits); dupState = 'ask';
-  $('#duplist').innerHTML = list.map(v => { const [l, c] = stLabel(v); return `<div class="flex items-center gap-3 p-2 rounded-xl border border-outline-variant/50"><div class="w-20 aspect-video rounded-lg bg-surface-container overflow-hidden shrink-0">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}</div>
-    <div class="flex-1 min-w-0"><p class="text-sm font-semibold truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${esc(catLabel(v))} · ${new Date(v.created_at).toLocaleDateString()}</p></div><span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${c}">${l}</span></div>`; }).join('');
+  const list = (await signVideos(hits)).sort((a, b) => a.created_at.localeCompare(b.created_at)); dupState = 'ask';
+  const items = [{ id: '__new', title: 'Your new file', video_url: newBlobUrl, isNew: true }, ...list.map((v, i) => ({ ...v, tag: i ? 'Duplicate' : 'Original' }))];
+  const play = it => { const dv = $('#dupvid'); dv.src = it.video_url || ''; dv.play().catch(() => { }); $('#duptitle').textContent = it.isNew ? 'Previewing: your new file' : `Previewing: ${it.title}`;
+    $$('#duplist [data-dup]').forEach(b => { const on = b.dataset.dup === it.id; b.classList.toggle('border-primary', on); b.classList.toggle('bg-primary-fixed/40', on); }); };
+  $('#duplist').innerHTML = items.map(v => { const [l, c] = v.isNew ? ['New', 'bg-primary text-on-primary'] : stLabel(v); return `<button type="button" data-dup="${v.id}" class="w-full text-left flex items-center gap-3 p-2 rounded-xl border border-outline-variant/50 hover:border-primary/60 transition">
+    <div class="w-20 aspect-video rounded-lg bg-surface-container overflow-hidden shrink-0 grid place-items-center">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : '<span class="material-symbols-outlined text-on-surface-variant">play_circle</span>'}</div>
+    <div class="flex-1 min-w-0"><p class="text-sm font-semibold truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${v.isNew ? 'Not saved yet' : `${esc(catLabel(v))} · ${new Date(v.created_at).toLocaleDateString()}`}</p></div>
+    ${v.tag ? `<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${v.tag === 'Original' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${v.tag}</span>` : ''}<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${c}">${l}</span></button>`; }).join('');
+  $$('#duplist [data-dup]').forEach(b => b.onclick = () => play(items.find(x => x.id === b.dataset.dup)));
+  play(items[1] || items[0]);
   $('#dupmodal').classList.remove('hidden');
 }
-function clearFile() { const f = $('#vform'); f.vfile.value = ''; fileHash = null; dupState = 'ok'; thumbBlob = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
-  const vid = $('#vprev'); vid.pause(); vid.removeAttribute('src'); vid.classList.toggle('hidden', !editing?.video_url); if (editing?.video_url) vid.src = editing.video_url;
-  $('#vmeta').textContent = 'Duration, resolution, frame rate, orientation and thumbnail are detected automatically.'; updateBothHint(); }
-$('#dupCancel').onclick = () => { $('#dupmodal').classList.add('hidden'); clearFile(); };
-$('#dupGo').onclick = () => { $('#dupmodal').classList.add('hidden'); dupState = 'ok'; toast('OK — it will be saved as a new variant'); updateBothHint(); };
+function clearFile() { const f = $('#vform'); f.vfile.value = ''; aiFrame = null; fileHash = null; dupState = 'ok'; thumbBlob = null; hashing = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
+  if (editing?.video_url) showPicked(editing.video_url, 'Current video', `${editing.resolution} · ${dur(editing.duration_seconds)}`); else showPicked(null); updateBothHint(); }
+const closeDup = () => { const dv = $('#dupvid'); dv.pause(); dv.removeAttribute('src'); $('#dupmodal').classList.add('hidden'); };
+$('#dupCancel').onclick = () => { closeDup(); clearFile(); };
+$('#dupGo').onclick = () => { closeDup(); dupState = 'ok'; toast('OK — it will be saved as a new variant'); updateBothHint(); };
 // Drag & drop onto the file box
 (() => { const z = $('#vdrop'), inp = $('#vform').vfile, on = x => { z.classList.toggle('border-primary', x); z.classList.toggle('bg-primary-fixed/40', x); };
   ['dragenter', 'dragover'].forEach(ev => z.addEventListener(ev, e => { e.preventDefault(); on(true); }));
@@ -312,9 +347,8 @@ async function backfillHashes() {
 const BTN = (mode, label, cls) => `<button ${mode ? `data-mode="${mode}"` : 'type="button" data-close'} class="px-4 py-2.5 rounded-lg ${cls}">${label}</button>`;
 function openVideo(v) {
   if (v && !isSuper()) return;
-  editing = v || null; thumbBlob = null; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
-  $('#vprev').classList.add('hidden'); $('#vprev').removeAttribute('src'); $('#progress').classList.add('hidden');
-  $('#vmeta').textContent = 'Duration, resolution, frame rate, orientation and thumbnail are detected automatically.';
+  editing = v || null; thumbBlob = null; aiFrame = null; lastAi = null; aiSeq++; $('#aiStat').textContent = ''; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
+  showPicked(null); $('#progress').classList.add('hidden'); f.category.value = '';
   const n = $('#vnote'); n.classList.toggle('hidden', isSuper()); n.textContent = 'Your video will be sent to a superadmin for review. It appears on the website only after approval.';
   $('#vbtns').innerHTML = isSuper()
     ? BTN(null, 'Cancel', 'border border-outline-variant') + BTN('draft', 'Save draft', 'border border-primary text-primary font-semibold') + BTN('approve', 'Approve', 'bg-primary text-on-primary font-semibold')
@@ -324,8 +358,7 @@ function openVideo(v) {
   if (v) {
     ['title', 'description', 'duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = v[k] ?? '');
     f.category.value = v.category; f.tags.value = (v.tags || []).join(', ');
-    if (v.video_url) { $('#vprev').src = v.video_url; $('#vprev').classList.remove('hidden'); }
-    $('#vmeta').textContent = `Current: ${v.resolution} · ${v.fps}fps · ${dur(v.duration_seconds)} · ${v.orientation}. Choose a new file only to replace it.`;
+    if (v.video_url) showPicked(v.video_url, 'Current video', `${v.resolution} · ${dur(v.duration_seconds)}`);
   }
   fillSubs(v?.subcategory); updateBothHint(); $('#vmodal').classList.remove('hidden'); f.title.focus();
 }
@@ -350,7 +383,7 @@ function detectFps(vid) {
 $('#vform').vfile.onchange = e => {
   const file = e.target.files[0]; if (!file) return; const f = $('#vform'), vid = $('#vprev');
   if (file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
-  vid.src = URL.createObjectURL(file); vid.classList.remove('hidden'); $('#vmeta').textContent = 'Analysing video…';
+  newBlobUrl = URL.createObjectURL(file); showPicked(newBlobUrl, file.name, 'Analysing…');
   fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); updateBothHint(); }).catch(() => { dupState = 'ok'; });
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   vid.onloadedmetadata = async () => {
@@ -360,9 +393,11 @@ $('#vform').vfile.onchange = e => {
     vid.onseeked = () => {
       const cv = document.createElement('canvas'); const sc = Math.min(1, 1280 / vid.videoWidth); cv.width = vid.videoWidth * sc; cv.height = vid.videoHeight * sc;
       cv.getContext('2d').drawImage(vid, 0, 0, cv.width, cv.height); cv.toBlob(b => { thumbBlob = b; }, 'image/jpeg', 0.82); vid.onseeked = null;
+      const ac = document.createElement('canvas'), as = Math.min(1, 768 / vid.videoWidth); ac.width = vid.videoWidth * as; ac.height = vid.videoHeight * as;
+      ac.getContext('2d').drawImage(vid, 0, 0, ac.width, ac.height); aiFrame = ac.toDataURL('image/jpeg', 0.7); aiSuggest(false);
     };
     vid.currentTime = Math.min(1, vid.duration / 3);
-    $('#vmeta').textContent = `Detected: ${w}×${h} (${f.resolution.value}) · ${f.fps.value}fps · ${dur(+f.duration_seconds.value)} · ${f.orientation.value}. Thumbnail created automatically.`;
+    $('#vmeta').textContent = `${f.resolution.value} · ${dur(+f.duration_seconds.value)}`;
   };
 };
 
@@ -379,7 +414,8 @@ $('#vform').onsubmit = async e => {
   try {
     const vf = f.vfile.files[0];
     if (!editing && !vf) throw new Error('Choose a video file to upload');
-    if (!f.subcategory.value) throw new Error('Pick a subcategory');
+    if (!f.category.value) throw new Error('Please select a category');
+    if (!f.subcategory.value) throw new Error('Please select a subcategory');
     if (vf && hashing) { $('#ptext').textContent = 'Checking for duplicates…'; await hashing; }
     if (vf && dupState === 'ask') { $('#dupmodal').classList.remove('hidden'); throw new Error('Confirm the duplicate warning first'); }
     const bothH = vf ? fileHash : editing?.file_hash, catChanged = !editing || vf || editing.category !== f.category.value;
@@ -428,53 +464,22 @@ function reqCard(r, forReview) {
   ${r.status === 'pending' ? `<div class="mt-3 rounded-xl bg-surface-container-low p-3">${diff(r)}</div>` : ''}${r.review_note ? `<p class="text-sm mt-2 text-on-surface-variant">Note: “${esc(r.review_note)}”</p>` : ''}
   ${forReview && r.status === 'pending' ? `<div class="flex gap-2 mt-4 justify-end"><button data-rno="${r.id}" class="px-4 py-2 rounded-lg border border-outline-variant text-sm font-medium hover:border-red-400 hover:text-red-700">Reject</button><button data-rok="${r.id}" class="px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800">Approve &amp; apply</button></div>` : ''}</div>`;
 }
-let rvSel = null, rvTab = 'videos';
-function setRvTab(t) { rvTab = t; $$('#rvTabs .rt').forEach(b => { const on = b.dataset.rt === t; b.classList.toggle('bg-primary', on); b.classList.toggle('text-on-primary', on); b.classList.toggle('text-on-surface-variant', !on); });
-  ['videos', 'changes', 'history'].forEach(k => $('#rp-' + k).classList.toggle('hidden', k !== t)); }
-$$('#rvTabs .rt').forEach(b => b.onclick = () => setRvTab(b.dataset.rt));
-function renderReview() {
-  if (!isSuper()) return;
-  const pv = videos.filter(v => v.status === 'pending').sort((a, b) => a.created_at.localeCompare(b.created_at)), pr = reqs.filter(r => r.status === 'pending');
-  const cnt = (el, n) => { el.textContent = n; el.className = 'ml-1 text-xs rounded-full px-1.5 py-0.5 ' + (n ? 'bg-error text-white' : 'bg-surface-container text-on-surface-variant'); };
-  cnt($('#rvCount'), pv.length); cnt($('#rcCount'), pr.length); setRvTab(rvTab);
-  const today = videos.filter(v => v.reviewed_by && v.status !== 'pending' && Date.now() - new Date(v.created_at) < 864e5).length;
-  $('#rvPills').innerHTML = [['hourglass_top', pv.length + ' waiting', 'bg-amber-100 text-amber-800'], ['check_circle', videos.filter(isLive).length + ' live', 'bg-green-100 text-green-800'], ['block', videos.filter(v => v.status === 'rejected').length + ' rejected', 'bg-red-100 text-red-800']]
-    .map(([i, t, c]) => `<span class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full ${c}"><span class="material-symbols-outlined !text-sm">${i}</span>${t}</span>`).join('');
-  $('#rvWrap').classList.toggle('hidden', !pv.length); $('#rvEmpty').classList.toggle('hidden', !!pv.length);
-  if (!pv.find(v => v.id === rvSel)) rvSel = pv[0]?.id;
-  $('#rvList').innerHTML = pv.map(v => `<button data-sel="${v.id}" class="w-full text-left flex gap-3 p-2.5 rounded-xl border transition ${v.id === rvSel ? 'border-primary bg-primary-fixed/40' : 'border-outline-variant/40 bg-white hover:border-primary/40'}">
-    <div class="w-24 aspect-video rounded-lg bg-surface-container overflow-hidden shrink-0 relative">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}<span class="absolute bottom-1 right-1 text-[10px] bg-black/70 text-white px-1 rounded">${dur(v.duration_seconds)}</span></div>
-    <div class="min-w-0"><p class="text-sm font-semibold line-clamp-2">${esc(v.title)}</p><p class="text-xs text-on-surface-variant mt-0.5 truncate">${esc(who(v.submitted_by))}</p><p class="text-[11px] text-on-surface-variant">${ago(v.created_at)}</p></div></button>`).join('');
-  const v = pv.find(x => x.id === rvSel);
-  $('#rvDetail').innerHTML = v ? `<div class="bg-white rounded-2xl border border-outline-variant/40 overflow-hidden">
-    <div class="aspect-video bg-black">${v.video_url ? `<video src="${esc(v.video_url)}" poster="${esc(v.thumbnail_url || '')}" controls preload="metadata" class="w-full h-full object-contain"></video>` : ''}</div>
-    <div class="p-5"><div class="flex flex-wrap items-start gap-3"><div class="flex-1 min-w-0"><h2 class="text-xl font-bold">${esc(v.title)}</h2><p class="text-sm text-on-surface-variant">${esc(cname(v.category))} › ${esc(cname(v.subcategory))}</p></div>
-    <div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full bg-primary-fixed text-primary text-xs font-bold grid place-items-center">${initials(who(v.submitted_by))}</span><div class="text-xs"><p class="font-medium">${esc(who(v.submitted_by))}</p><p class="text-on-surface-variant">${new Date(v.created_at).toLocaleString()}</p></div></div></div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">${[['Resolution', v.resolution], ['Frame rate', v.fps + ' fps'], ['Duration', dur(v.duration_seconds)], ['Orientation', v.orientation]].map(([k, x]) => `<div class="rounded-lg bg-surface-container-low p-2.5"><p class="text-[11px] text-on-surface-variant">${k}</p><p class="text-sm font-semibold capitalize">${esc(x)}</p></div>`).join('')}</div>
-    ${v.description ? `<p class="text-sm mt-4">${esc(v.description)}</p>` : '<p class="text-sm mt-4 text-on-surface-variant italic">No description.</p>'}
-    <div class="flex flex-wrap gap-1.5 mt-3">${(v.tags || []).map(t => `<span class="text-xs px-2 py-0.5 rounded-full bg-surface-container">#${esc(t)}</span>`).join('') || '<span class="text-xs text-on-surface-variant italic">No tags</span>'}</div>
-    <div class="flex flex-wrap gap-2 mt-6 pt-4 border-t border-outline-variant/40"><button data-vedit="${v.id}" class="px-4 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary-fixed/50 flex items-center gap-1"><span class="material-symbols-outlined !text-lg">edit</span>Edit first</button><span class="flex-1"></span>
-    <button data-vno="${v.id}" class="px-4 py-2.5 rounded-lg border border-outline-variant text-sm font-medium hover:border-red-400 hover:text-red-700 flex items-center gap-1"><span class="material-symbols-outlined !text-lg">block</span>Reject</button>
-    <button data-vok="${v.id}" class="px-5 py-2.5 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 flex items-center gap-1"><span class="material-symbols-outlined !text-lg">check</span>Approve &amp; publish</button></div></div></div>` : '';
-  $('#rcList').innerHTML = pr.map(r => reqCard(r, true)).join('') || '<div class="text-center py-16 bg-white rounded-2xl border border-outline-variant/40 text-on-surface-variant"><span class="material-symbols-outlined !text-5xl">inbox</span><p class="mt-2">No pending change requests.</p></div>';
-  const hist = [...videos.filter(x => x.status !== 'pending' && x.reviewed_by).map(x => ({ t: x.title, by: who(x.submitted_by), st: x.status, note: x.review_note, at: x.created_at, k: 'movie' })),
-    ...reqs.filter(r => r.status !== 'pending').map(r => ({ t: r.summary, by: r.requested_email || who(r.requested_by), st: r.status, note: r.review_note, at: r.reviewed_at || r.created_at, k: 'edit_note' }))].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 40);
-  $('#rcDone').innerHTML = hist.map(h => `<tr class="border-b border-outline-variant/30 last:border-0"><td class="p-3"><span class="inline-flex items-center gap-2"><span class="material-symbols-outlined text-on-surface-variant !text-lg">${h.k}</span>${esc(h.t)}</span></td><td class="p-3 text-on-surface-variant">${esc(h.by)}</td>
-    <td class="p-3"><span class="text-xs font-semibold px-2.5 py-1 rounded-full ${h.st === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${h.st}</span></td><td class="p-3 text-on-surface-variant max-w-[260px] truncate">${esc(h.note || '—')}</td><td class="p-3 text-on-surface-variant whitespace-nowrap">${ago(h.at)}</td></tr>`).join('') || '<tr><td colspan="5" class="p-6 text-center text-on-surface-variant">Nothing reviewed yet.</td></tr>';
+function renderReview() { }
+// ---------------- UPLOAD GUIDE (admin) ----------------
+function renderGuide() {
+  if (isSuper()) return; const mine = videos.filter(v => v.submitted_by === me.id), rej = mine.filter(v => v.status === 'rejected');
+  const card = (i, t, body) => `<div class="bg-white rounded-2xl border border-outline-variant/40 p-5"><div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary">${i}</span><h2 class="font-semibold">${t}</h2></div><div class="text-sm text-on-surface-variant space-y-1.5">${body}</div></div>`;
+  const reasons = {}; rej.forEach(v => (v.review_note || '').split(/\.\s*/).map(x => x.trim()).filter(Boolean).forEach(r => reasons[r] = (reasons[r] || 0) + 1));
+  const topR = Object.entries(reasons).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  $('#guide').innerHTML = `<div class="grid gap-4 lg:grid-cols-2">
+  ${card('route', 'How it works', `<p>1. Click <b>Add video</b> and drop your file.</p><p>2. Pick the category and subcategory, then add a clear title and tags.</p><p>3. Click <b>Save</b> — a superadmin reviews it.</p><p>4. Track the result in <b>My requests</b>. Approved videos go live on the website.</p>`)}
+  ${card('checklist', 'Before you upload', `<p>• One clip per upload, max <b>50 MB</b>.</p><p>• Use a descriptive title (what is happening in the clip).</p><p>• Add 3–6 tags people would search for, e.g. <i>court, judge, gavel</i>.</p><p>• Horizontal clips work best on the website.</p>`)}
+  ${card('handshake', '“For Both” rule', `<p>A video can be added to <b>For Both</b> only when the same video is already in <b>For Lawyers</b> and <b>For Doctors</b>.</p>`)}
+  ${card('content_copy', 'Duplicates', `<p>If you upload a file that is already in the library you'll see a warning with a preview. Continuing saves it as “Title - Variant N”.</p>`)}
+  ${card('category', 'Categories', mains().map(m => `<p><b>${esc(m.name)}</b>: ${subsOf(m.slug).map(x => esc(x.name)).join(', ') || '—'}</p>`).join(''))}
+  ${card('insights', 'Your results', `<p>${mine.length} uploaded · <span class="text-green-700">${mine.filter(isLive).length} live</span> · <span class="text-amber-700">${mine.filter(v => v.status === 'pending').length} waiting</span> · <span class="text-red-700">${rej.length} rejected</span></p>${topR.length ? `<p class="pt-1">Most common rejection reasons:</p>${topR.map(([r, n]) => `<p>• ${esc(r)} <span class="text-xs">(${n}×)</span></p>`).join('')}` : ''}`)}
+  </div>`;
 }
-$('#t-review').onclick = async e => {
-  const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.sel) { rvSel = d.sel; return renderReview(); }
-  if (b.id === 'approveAll') { const pv = videos.filter(v => v.status === 'pending'); if (!pv.length || !confirm(`Approve and publish all ${pv.length} videos?`)) return;
-    const { error } = await sb.from('videos').update({ status: 'approved', published: true, reviewed_by: me.id, review_note: null }).in('id', pv.map(v => v.id)); if (error) return toast(error.message, 1); toast(`${pv.length} videos approved`); return loadAll(); }
-  if (d.vok || d.vno) return reviewVideo(videos.find(v => v.id === (d.vok || d.vno)), !!d.vok);
-  if (d.vedit) return openVideo(videos.find(v => v.id === d.vedit));
-  if (d.rok || d.rno) {
-    let note = null; if (d.rno) { note = await askReject(reqs.find(r => r.id === d.rno)?.summary || 'Change request'); if (note === null) return; }
-    b.disabled = true; const { error } = await sb.rpc('review_change_request', { p_id: d.rok || d.rno, p_approve: !!d.rok, p_note: note });
-    if (error) { b.disabled = false; return toast(error.message, 1); } toast(d.rok ? 'Approved & applied' : 'Rejected'); loadAll();
-  }
-};
 
 // ---------------- MY REQUESTS (admin) ----------------
 function renderMyReq() {
