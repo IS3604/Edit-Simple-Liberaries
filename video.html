@@ -31,9 +31,9 @@ ${v.content?`<div class="mt-5 rounded-xl bg-surface-container-low p-4"><p class=
 <button id="share" class="w-full mt-3 border border-outline-variant rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:border-primary hover:text-primary"><span class="material-symbols-outlined">share</span>Copy link</button></div></aside></div>
 <section class="mt-16"><h2 class="text-xl font-bold mb-4">More in ${e(sn)}</h2><div id="rel" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">${esSkel(3)}</div></section>`;
 document.getElementById('dl').onclick=async e=>{if(!v.video_url)return esToast('Download not available yet');
- const b=e.currentTarget,lbl=b.innerHTML,ext=(v.video_url.split('?')[0].match(/\.(\w{2,4})$/)||[,'mp4'])[1],name=(v.title.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,80)||'video')+'.'+ext;
+ const b=e.currentTarget,lbl=b.innerHTML,ext=((v._path||v.video_url).split('?')[0].match(/\.(\w{2,4})$/)||[,'mp4'])[1],name=(v.title.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,80)||'video')+'.'+ext;
  const save=href=>{const a=document.createElement('a');a.href=href;a.download=name;document.body.appendChild(a);a.click();a.remove()};
- if(/\/storage\/v1\/object\/public\//.test(v.video_url)){save(v.video_url+(v.video_url.includes('?')?'&':'?')+'download='+encodeURIComponent(name));return esToast('Download started')}
+ if(v._path){const u=await ES.downloadUrl(v,name);if(u){save(u);return esToast('Download started')}}
  b.disabled=true;b.innerHTML='<span class="material-symbols-outlined animate-spin">progress_activity</span>Preparing…';
  try{const r=await fetch(v.video_url);if(!r.ok)throw 0;const u=URL.createObjectURL(await r.blob());save(u);setTimeout(()=>URL.revokeObjectURL(u),6e4);esToast('Download started')}
  catch{esToast('Could not download this file')}b.disabled=false;b.innerHTML=lbl};

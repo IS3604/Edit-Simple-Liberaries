@@ -12,7 +12,7 @@ const dur = s => `${Math.floor((s || 0) / 60)}:${String((s || 0) % 60).padStart(
 const skRows = (n, cols) => Array.from({ length: n }, () => `<tr>${Array.from({ length: cols }, (_, i) => `<td class="p-3"><div class="sk h-${i ? 4 : 12} ${i ? 'w-20' : 'w-48'}"></div></td>`).join('')}</tr>`).join('');
 const skCards = (n, h = 28) => Array.from({ length: n }, () => `<div class="sk h-${h} !rounded-xl"></div>`).join('');
 
-let me = null, role = null, cats = [], videos = [], reqs = [], team = [], invites = [];
+let topLevel = false, me = null, role = null, cats = [], videos = [], reqs = [], team = [], invites = [];
 const isSuper = () => role === 'superadmin';
 
 // ---------------- AUTH ----------------
@@ -61,12 +61,12 @@ async function boot(skipLink) {
   if (!skipLink && (linkType === 'invite' || linkType === 'recovery' || (['magiclink', 'signup', 'email'].includes(linkType) && !me.user_metadata?.password_set))) return askPassword(me, linkType);
   const { data: r } = await sb.rpc('my_role');
   if (!r) { await sb.auth.signOut(); $('#loginErr').textContent = 'This account has no admin access yet. Ask a superadmin to add you in Team.'; return show('login'); }
-  role = r;
+  role = lvl(r); topLevel = !!(await sb.rpc('can_manage_all')).data;
   $('#meEmail').textContent = me.email;
   $('#meRole').textContent = role; $('#meRole').className += isSuper() ? ' bg-primary text-on-primary' : ' bg-surface-container text-on-surface-variant';
   buildTabs(); show('app');
   paintSkeletons(); tab(location.hash.slice(1) || 'dash');
-  await loadAll(); live();
+  await loadAll(); live(); setTimeout(backfillHashes, 1500);
 }
 // ---------------- LIVE UPDATES ----------------
 let liveCh = null, liveT = null;
@@ -122,14 +122,23 @@ async function loadAll() {
     sb.from('change_requests').select('*').order('created_at', { ascending: false }).limit(200),
     sb.from('admins').select('user_id,email,role'), sb.from('admin_invites').select('*').order('created_at', { ascending: false })]);
   for (const [n, x] of [['Categories', c], ['Videos', v], ['Requests', r], ['Team', a]]) if (x.error) toast(`${n}: ${x.error.message}${/does not exist|column/.test(x.error.message) ? ' — run roles.sql' : ''}`, 1);
-  const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && myNew !== role) { location.reload(); return; }
-  cats = c.data || []; videos = v.data || []; reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
+  const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && lvl(myNew) !== role) { location.reload(); return; }
+  cats = c.data || []; videos = await signVideos(v.data || []); reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
   renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites();
+}
+// roles above 'admin' are all shown as superadmin
+const lvl = r => r === 'admin' ? 'admin' : r ? 'superadmin' : null;
+// Private bucket → short-lived signed links for thumbnails / players
+const signCache = new Map();
+async function signVideos(list) {
+  const now = Date.now(), need = [...new Set(list.flatMap(v => [storagePath(v.video_url), storagePath(v.thumbnail_url)]).filter(p => p && !(signCache.get(p)?.exp > now)))];
+  for (let i = 0; i < need.length; i += 500) { const { data } = await sb.storage.from('videos').createSignedUrls(need.slice(i, i + 500), 3600); (data || []).forEach(d => d.signedUrl && signCache.set(d.path, { url: d.signedUrl, exp: now + 50 * 60e3 })); }
+  return list.map(v => ({ ...v, video_url: signCache.get(storagePath(v.video_url))?.url || v.video_url, thumbnail_url: signCache.get(storagePath(v.thumbnail_url))?.url || v.thumbnail_url }));
 }
 const mains = () => cats.filter(c => !c.parent_slug);
 const subsOf = m => cats.filter(c => c.parent_slug === m);
 const cname = s => cats.find(c => c.slug === s)?.name || s;
-const who = id => team.find(t => t.user_id === id)?.email || (id === me.id ? me.email : 'unknown');
+const who = id => team.find(t => t.user_id === id)?.email || (id === me.id ? me.email : 'Superadmin');
 const isLive = v => v.status === 'approved' && v.published;
 const pendReqFor = (entity, target) => reqs.find(r => r.status === 'pending' && r.entity === entity && r.target === target);
 
@@ -159,14 +168,15 @@ function statusChip(v) {
   return `<span class="inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${c}">${l}</span>${pr ? `<span class="block mt-1 text-[11px] text-amber-700">Change ${pr.action} pending</span>` : ''}${v.status === 'rejected' && v.review_note ? `<span class="block mt-1 text-[11px] text-red-700 max-w-[160px]">“${esc(v.review_note)}”</span>` : ''}`;
 }
 function canDirect(v) { return isSuper(); }
+const dupSet = () => { const n = {}; videos.forEach(v => v.file_hash && (n[v.file_hash] = (n[v.file_hash] || 0) + 1)); return new Set(Object.keys(n).filter(h => n[h] > 1)); };
 function renderVideos() {
-  const q = $('#vq').value.toLowerCase().trim(), c = $('#vcat').value, s = $('#vstat').value;
+  const q = $('#vq').value.toLowerCase().trim(), c = $('#vcat').value, s = $('#vstat').value, dups = dupSet();
   const list = videos.filter(v => (!q || (v.search_text || (v.title + ' ' + (v.tags || []).join(' '))).toLowerCase().includes(q)) && (!c || v.category === c || v.subcategory === c) &&
-    (!s || (s === 'live' && isLive(v)) || (s === 'hidden' && v.status === 'approved' && !v.published) || s === v.status || (s === 'mine' && v.submitted_by === me.id)));
+    (!s || (s === 'live' && isLive(v)) || (s === 'hidden' && v.status === 'approved' && !v.published) || s === v.status || (s === 'mine' && v.submitted_by === me.id) || (s === 'dup' && dups.has(v.file_hash))));
   $('#vempty').classList.toggle('hidden', list.length > 0);
   $('#vrows').innerHTML = list.map(v => `<tr class="border-b border-outline-variant/30 last:border-0 align-top">
     <td class="p-3"><div class="flex items-center gap-3"><button data-play="${v.id}" class="relative w-24 aspect-video rounded-md bg-surface-container overflow-hidden shrink-0" aria-label="Preview">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" loading="lazy" class="w-full h-full object-cover" alt="">` : ''}<span class="material-symbols-outlined absolute inset-0 m-auto h-fit w-fit text-white drop-shadow !text-xl">play_circle</span></button>
-      <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
+      <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${esc(v.title)}</p>${dups.has(v.file_hash) ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded mt-0.5"><span class="material-symbols-outlined !text-xs">content_copy</span>Duplicate</span>' : ''}<p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
     <td class="p-3 whitespace-nowrap">${esc(cname(v.category))}<br><span class="text-xs text-on-surface-variant">${esc(cname(v.subcategory))}</span></td>
     <td class="p-3 whitespace-nowrap text-xs">${esc(v.resolution)} · ${v.fps}fps<br>${dur(v.duration_seconds)} · ${esc(v.orientation)}</td>
     <td class="p-3">${statusChip(v)}</td>
@@ -195,7 +205,7 @@ $('#vrows').onclick = async e => {
 };
 function preview(v) { if (!v?.video_url) return toast('No video file', 1); $('#pvid').src = v.video_url; $('#pmodal').classList.remove('hidden'); $('#pvid').play().catch(() => { }); }
 $('#pmodal').addEventListener('click', e => { if (e.target.id === 'pmodal' || e.target.closest('[data-close]')) { $('#pvid').pause(); $('#pvid').removeAttribute('src'); $('#pmodal').classList.add('hidden'); } });
-const storagePath = url => { const m = String(url || '').match(/\/storage\/v1\/object\/public\/videos\/(.+)$/); return m ? decodeURIComponent(m[1]) : null; };
+function storagePath(url) { const m = String(url || '').match(/\/storage\/v1\/object\/(?:public|sign)\/videos\/([^?]+)/); return m ? decodeURIComponent(m[1]) : null; }
 
 async function request(entity, action, target, payload, summary) {
   const { error } = await sb.from('change_requests').insert({ entity, action, target, payload, summary, requested_by: me.id, requested_email: me.email });
@@ -233,19 +243,66 @@ function fillCatSelects() {
   $('#cform').parent_slug.innerHTML = '<option value="">— None (main category) —</option>' + opts;
 }
 function fillSubs(sel) { const f = $('#vform'); f.subcategory.innerHTML = subsOf(f.category.value).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); if (sel) f.subcategory.value = sel; }
-$('#vform').category.onchange = () => fillSubs();
+$('#vform').category.onchange = () => { fillSubs(); updateBothHint(); };
 
-let editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null;
+let editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null;
+// ---- Duplicate warning (same file already uploaded) ----
+const catLabel = v => `${cname(v.category)} › ${cname(v.subcategory)}`;
+const stLabel = v => ({ pending: ['Pending', 'bg-amber-100 text-amber-800'], rejected: ['Rejected', 'bg-red-100 text-red-800'], approved: v.published ? ['Live', 'bg-green-100 text-green-800'] : ['Hidden', 'bg-surface-container text-on-surface-variant'] }[v.status] || ['', '']);
+async function checkDuplicate(h) {
+  const { data } = await sb.from('videos').select('id,title,category,subcategory,status,published,thumbnail_url,video_url,created_at,submitted_by').eq('file_hash', h);
+  const hits = (data || []).filter(v => v.id !== editing?.id);
+  if (!hits.length) { dupState = 'ok'; return; }
+  const list = await signVideos(hits); dupState = 'ask';
+  $('#duplist').innerHTML = list.map(v => { const [l, c] = stLabel(v); return `<div class="flex items-center gap-3 p-2 rounded-xl border border-outline-variant/50"><div class="w-20 aspect-video rounded-lg bg-surface-container overflow-hidden shrink-0">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}</div>
+    <div class="flex-1 min-w-0"><p class="text-sm font-semibold truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${esc(catLabel(v))} · ${new Date(v.created_at).toLocaleDateString()}</p></div><span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${c}">${l}</span></div>`; }).join('');
+  $('#dupmodal').classList.remove('hidden');
+}
+function clearFile() { const f = $('#vform'); f.vfile.value = ''; fileHash = null; dupState = 'ok'; thumbBlob = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
+  const vid = $('#vprev'); vid.pause(); vid.removeAttribute('src'); vid.classList.toggle('hidden', !editing?.video_url); if (editing?.video_url) vid.src = editing.video_url;
+  $('#vmeta').textContent = 'Duration, resolution, frame rate, orientation and thumbnail are detected automatically.'; updateBothHint(); }
+$('#dupCancel').onclick = () => { $('#dupmodal').classList.add('hidden'); clearFile(); };
+$('#dupGo').onclick = () => { $('#dupmodal').classList.add('hidden'); dupState = 'ok'; toast('OK — it will be saved as a new variant'); updateBothHint(); };
+// Drag & drop onto the file box
+(() => { const z = $('#vdrop'), inp = $('#vform').vfile, on = x => { z.classList.toggle('border-primary', x); z.classList.toggle('bg-primary-fixed/40', x); };
+  ['dragenter', 'dragover'].forEach(ev => z.addEventListener(ev, e => { e.preventDefault(); on(true); }));
+  ['dragleave', 'drop'].forEach(ev => z.addEventListener(ev, e => { e.preventDefault(); on(false); }));
+  z.addEventListener('drop', e => { const file = [...(e.dataTransfer?.files || [])].find(x => x.type.startsWith('video/')); if (!file) return toast('Please drop a video file', 1);
+    const dt = new DataTransfer(); dt.items.add(file); inp.files = dt.files; inp.dispatchEvent(new Event('change')); }); })();
+// ---- "For Both" rule: the same video must already be in For Lawyers AND For Doctors ----
+function bothAllowed(h, exceptId) { if (!h) return false; const ok = c => videos.some(v => v.file_hash === h && v.category === c && v.status !== 'rejected' && v.id !== exceptId); return ok('lawyers') && ok('doctors'); }
+function updateBothHint() { const f = $('#vform'), el = $('#bothHint'); if (f.category.value !== 'both') return el.classList.add('hidden');
+  const h = fileHash || (!f.vfile.files[0] && editing?.file_hash);
+  el.className = 'sm:col-span-2 -mt-2 text-xs rounded-lg px-3 py-2 border ' + (h && bothAllowed(h, editing?.id) ? 'bg-green-50 text-green-800 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200');
+  el.textContent = h && bothAllowed(h, editing?.id) ? '✓ This video is already in For Lawyers and For Doctors — it can be added to For Both.' : 'For Both is only allowed when this same video is already in For Lawyers and For Doctors.'; }
 // Fingerprint of the file (size + SHA-256 of first/last 4 MB) to detect re-uploads of the same video
 async function fingerprint(file) {
   const MB = 4 * 1024 * 1024, parts = file.size <= 2 * MB ? [file] : [file.slice(0, MB), file.slice(file.size - MB)];
   const buf = await new Blob([String(file.size), ...parts]).arrayBuffer();
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map(b => b.toString(16).padStart(2, '0')).join('');
 }
+// Same fingerprint for an already-uploaded file (HTTP Range requests, no full download)
+async function remoteFingerprint(url) {
+  const MB = 4 * 1024 * 1024;
+  const r0 = await fetch(url, { headers: { Range: 'bytes=0-0' } }); const size = +(r0.headers.get('content-range') || '').split('/')[1];
+  if (!size) throw new Error('no size');
+  const get = async (a, b) => new Uint8Array(await (await fetch(url, { headers: { Range: `bytes=${a}-${b}` } })).arrayBuffer());
+  const parts = size <= 2 * MB ? [await get(0, size - 1)] : [await get(0, MB - 1), await get(size - MB, size - 1)];
+  const buf = await new Blob([String(size), ...parts]).arrayBuffer();
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+// Superadmin: fingerprint older videos (uploaded before duplicate detection) in the background
+let backfilling = false;
+async function backfillHashes() {
+  if (!isSuper() || backfilling) return; backfilling = true;
+  const todo = videos.filter(v => !v.file_hash && storagePath(v.video_url)).slice(0, 25); let n = 0;
+  for (const v of todo) { try { const h = await remoteFingerprint(v.video_url); const { error } = await sb.from('videos').update({ file_hash: h }).eq('id', v.id); if (!error) n++; } catch { } }
+  backfilling = false; if (n) { toast(`Checked ${n} older video(s) for duplicates`); loadAll(); }
+}
 const BTN = (mode, label, cls) => `<button ${mode ? `data-mode="${mode}"` : 'type="button" data-close'} class="px-4 py-2.5 rounded-lg ${cls}">${label}</button>`;
 function openVideo(v) {
   if (v && !isSuper()) return;
-  editing = v || null; thumbBlob = null; fileHash = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
+  editing = v || null; thumbBlob = null; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
   $('#vprev').classList.add('hidden'); $('#vprev').removeAttribute('src'); $('#progress').classList.add('hidden');
   $('#vmeta').textContent = 'Duration, resolution, frame rate, orientation and thumbnail are detected automatically.';
   const n = $('#vnote'); n.classList.toggle('hidden', isSuper()); n.textContent = 'Your video will be sent to a superadmin for review. It appears on the website only after approval.';
@@ -260,7 +317,7 @@ function openVideo(v) {
     if (v.video_url) { $('#vprev').src = v.video_url; $('#vprev').classList.remove('hidden'); }
     $('#vmeta').textContent = `Current: ${v.resolution} · ${v.fps}fps · ${dur(v.duration_seconds)} · ${v.orientation}. Choose a new file only to replace it.`;
   }
-  fillSubs(v?.subcategory); $('#vmodal').classList.remove('hidden'); f.title.focus();
+  fillSubs(v?.subcategory); updateBothHint(); $('#vmodal').classList.remove('hidden'); f.title.focus();
 }
 $('#newVideo').onclick = () => openVideo();
 $$('#vmodal [data-close], #cmodal [data-close]').forEach(b => b.onclick = () => b.closest('.fixed').classList.add('hidden'));
@@ -284,7 +341,7 @@ $('#vform').vfile.onchange = e => {
   const file = e.target.files[0]; if (!file) return; const f = $('#vform'), vid = $('#vprev');
   if (file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
   vid.src = URL.createObjectURL(file); vid.classList.remove('hidden'); $('#vmeta').textContent = 'Analysing video…';
-  fileHash = null; fingerprint(file).then(h => fileHash = h).catch(() => { });
+  fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); updateBothHint(); }).catch(() => { dupState = 'ok'; });
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   vid.onloadedmetadata = async () => {
     f.duration_seconds.value = Math.round(vid.duration); const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h);
@@ -313,6 +370,10 @@ $('#vform').onsubmit = async e => {
     const vf = f.vfile.files[0];
     if (!editing && !vf) throw new Error('Choose a video file to upload');
     if (!f.subcategory.value) throw new Error('Pick a subcategory');
+    if (vf && hashing) { $('#ptext').textContent = 'Checking for duplicates…'; await hashing; }
+    if (vf && dupState === 'ask') { $('#dupmodal').classList.remove('hidden'); throw new Error('Confirm the duplicate warning first'); }
+    const bothH = vf ? fileHash : editing?.file_hash, catChanged = !editing || vf || editing.category !== f.category.value;
+    if (f.category.value === 'both' && catChanged && !bothAllowed(bothH, editing?.id)) throw new Error('For Both is only allowed when this same video is already in For Lawyers and For Doctors.');
     if (vf && !f.duration_seconds.value) throw new Error('Still analysing the video — try again in a second');
     const row = {
       title: f.title.value.trim(), description: f.description.value.trim(), category: f.category.value, subcategory: f.subcategory.value,
@@ -473,18 +534,19 @@ $('#cform').onsubmit = async e => {
 function renderTeam() {
   if (!isSuper()) return;
   const st = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${i}</span></span><div><p class="text-2xl font-bold leading-none">${n}</p><p class="text-xs text-on-surface-variant mt-1">${l}</p></div></div>`;
-  $('#teamStats').innerHTML = st('groups', team.length, 'Members') + st('shield_person', team.filter(t => t.role === 'superadmin').length, 'Superadmins') + st('person', team.filter(t => t.role === 'admin').length, 'Admins') + st('mail', invites.length, 'Pending invites');
-  const sorted = [...team].sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || (a.role === b.role ? 0 : a.role === 'superadmin' ? -1 : 1));
-  $('#teamRows').innerHTML = sorted.map(t => { const up = videos.filter(v => v.submitted_by === t.user_id), you = t.user_id === me.id, sup = t.role === 'superadmin';
+  $('#teamStats').innerHTML = st('groups', team.length, 'Members') + st('shield_person', team.filter(t => lvl(t.role) === 'superadmin').length, 'Superadmins') + st('person', team.filter(t => t.role === 'admin').length, 'Admins') + st('mail', invites.length, 'Pending invites');
+  const sorted = [...team].sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || (lvl(a.role) === lvl(b.role) ? 0 : lvl(a.role) === 'superadmin' ? -1 : 1));
+  $('#teamRows').innerHTML = sorted.map(t => { const up = videos.filter(v => v.submitted_by === t.user_id), you = t.user_id === me.id, sup = lvl(t.role) === 'superadmin', locked = !you && sup && !topLevel;
     return `<div class="bg-white rounded-2xl border border-outline-variant/40 p-4">
     <div class="flex items-center gap-3"><span class="w-11 h-11 rounded-full grid place-items-center font-bold text-sm ${sup ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface'}">${initials(t.email)}</span>
     <div class="flex-1 min-w-0"><p class="font-semibold truncate">${esc(t.email || t.user_id)}</p><p class="text-xs text-on-surface-variant">${you ? 'You · ' : ''}${up.length} uploads · ${up.filter(isLive).length} live</p></div>
     <span class="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${sup ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-surface-container text-on-surface-variant'}">${sup ? 'Superadmin' : 'Admin'}</span></div>
-    ${you ? '' : `<div class="flex items-center gap-2 mt-4 pt-3 border-t border-outline-variant/40"><select data-role="${t.user_id}" aria-label="Role" class="flex-1 rounded-lg border-outline-variant text-sm py-1.5 focus:ring-primary"><option value="admin" ${!sup ? 'selected' : ''}>Admin</option><option value="superadmin" ${sup ? 'selected' : ''}>Superadmin</option></select>
+    ${locked ? `<p class="flex items-center gap-1.5 mt-4 pt-3 border-t border-outline-variant/40 text-xs text-on-surface-variant"><span class="material-symbols-outlined !text-base">lock</span>Protected — superadmins can't change other superadmins.</p>` : ''}
+    ${you || locked ? '' : `<div class="flex items-center gap-2 mt-4 pt-3 border-t border-outline-variant/40"><select data-role="${t.user_id}" aria-label="Role" class="flex-1 rounded-lg border-outline-variant text-sm py-1.5 focus:ring-primary"><option value="admin" ${!sup ? 'selected' : ''}>Admin</option><option value="superadmin" ${sup ? 'selected' : ''}>Superadmin</option></select>
     <button data-rm="${t.user_id}" data-em="${esc(t.email)}" class="px-3 py-1.5 rounded-lg text-sm text-error font-medium hover:bg-red-50 flex items-center gap-1"><span class="material-symbols-outlined !text-base">person_remove</span>Remove</button></div>`}</div>`; }).join('');
 }
-$('#teamRows').onchange = async e => { const id = e.target.dataset.role; if (!id) return; const { error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id); if (error) return toast(error.message, 1); toast('Role updated'); loadAll(); };
-$('#teamRows').onclick = async e => { const b = e.target.closest('[data-rm]'); if (!b || !confirm(`Remove admin access for ${b.dataset.em}?`)) return; const { error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm); if (error) return toast(error.message, 1); toast('Removed'); loadAll(); };
+$('#teamRows').onchange = async e => { const id = e.target.dataset.role; if (!id) return; const { data, error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id).select('user_id'); if (error) { loadAll(); return toast(error.message, 1); } if (!data?.length) { loadAll(); return toast("You don't have permission to change this member", 1); } toast('Role updated'); loadAll(); };
+$('#teamRows').onclick = async e => { const b = e.target.closest('[data-rm]'); if (!b || !confirm(`Remove admin access for ${b.dataset.em}?`)) return; const { data, error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm).select('user_id'); if (error) return toast(error.message, 1); if (!data?.length) return toast("You don't have permission to remove this member", 1); toast('Removed'); loadAll(); };
 async function sendInvite(email, role) {
   const { data, error } = await sb.functions.invoke('invite-admin', { body: { email, role, redirectTo: ADMIN_URL } });
   let msg = error?.message; if (error && error.context?.json) { try { msg = (await error.context.json()).error || msg; } catch { } }

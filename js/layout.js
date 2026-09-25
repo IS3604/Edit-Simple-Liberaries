@@ -24,14 +24,17 @@ function header(){
 <a href="index.html" class="flex items-center gap-2.5 shrink-0" aria-label="Edit Simple Libraries home"><img src="logo.png" alt="" width="36" height="36" class="h-9 w-9 rounded-lg object-cover ring-2 ring-white"><span class="font-display font-bold text-on-surface text-[17px] leading-tight hidden sm:block">Edit Simple<span class="block text-[11px] font-medium text-on-surface-variant tracking-wide uppercase">Libraries</span></span></a>
 <nav class="hidden lg:flex items-center gap-1 mx-auto">${nav.map(link).join('')}</nav>
 <div class="flex items-center gap-2 ml-auto lg:ml-0"><button id="es-search" class="flex items-center gap-2 h-9 pl-3 pr-2 rounded-full bg-white/80 hover:bg-white text-on-surface text-sm border border-orange-200 transition" aria-label="Search videos"><span class="material-symbols-outlined !text-[20px]">search</span><span class="hidden md:inline text-on-surface-variant pr-1">Search videos</span><kbd class="hidden md:inline text-[10px] font-semibold bg-primary-fixed rounded px-1.5 py-0.5">⌘K</kbd></button>
-<a href="admin.html" class="hidden sm:flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-primary text-white text-sm font-semibold hover:brightness-95 transition shadow-sm"><span class="material-symbols-outlined !text-[18px]">login</span>Admin login</a>
+${ES.user?`<a href="admin.html" class="hidden sm:flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-primary text-white text-sm font-semibold hover:brightness-95 transition shadow-sm"><span class="material-symbols-outlined !text-[18px]">dashboard</span>Admin panel</a>
+<button id="es-out" title="Log out (${esc(ES.user.email)})" aria-label="Log out" class="h-9 w-9 grid place-items-center rounded-full bg-white/80 hover:bg-white text-on-surface border border-orange-200"><span class="material-symbols-outlined !text-[20px]">logout</span></button>`
+:`<a href="admin.html" class="hidden sm:flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-primary text-white text-sm font-semibold hover:brightness-95 transition shadow-sm"><span class="material-symbols-outlined !text-[18px]">login</span>Admin login</a>`}
 <button id="es-menu" class="lg:hidden h-9 w-9 grid place-items-center rounded-full bg-white/80 hover:bg-white text-on-surface border border-orange-200" aria-label="Open menu" aria-expanded="false"><span class="material-symbols-outlined">menu</span></button></div></div>
-<nav id="es-mnav" class="hidden lg:hidden border-t border-orange-200 px-4 py-3 flex-col gap-1">${nav.map(link).join('')}<a href="admin.html" class="flex items-center gap-1.5 h-9 px-3.5 rounded-full text-sm font-semibold text-primary"><span class="material-symbols-outlined !text-[18px]">login</span>Admin login</a></nav>`;
+<nav id="es-mnav" class="hidden lg:hidden border-t border-orange-200 px-4 py-3 flex-col gap-1">${nav.map(link).join('')}<a href="admin.html" class="flex items-center gap-1.5 h-9 px-3.5 rounded-full text-sm font-semibold text-primary"><span class="material-symbols-outlined !text-[18px]">${ES.user?'dashboard':'login'}</span>${ES.user?'Admin panel':'Admin login'}</a></nav>`;
   let h=document.getElementById('es-header');
   if(!h){h=document.createElement('header');h.id='es-header';h.className='sticky top-0 z-50 w-full bg-primary-fixed border-b border-orange-200';document.body.prepend(h)}
   h.innerHTML=html;
   document.getElementById('es-menu').onclick=e=>{const m=document.getElementById('es-mnav');const open=m.classList.toggle('hidden');m.classList.toggle('flex',!open);e.currentTarget.setAttribute('aria-expanded',String(!open))};
   document.getElementById('es-search').onclick=openSearch;
+  const out=document.getElementById('es-out');if(out)out.onclick=()=>ES.logout();
 }
 function footer(){let f=document.getElementById('es-footer');if(!f){f=document.createElement('footer');f.id='es-footer';f.className='mt-24 border-t border-outline-variant/40 bg-surface-container-low';document.body.append(f)}
   f.innerHTML=`<div class="max-w-7xl mx-auto px-4 md:px-6 py-12 grid gap-8 sm:grid-cols-2 md:grid-cols-${Math.min(ES.CATS.length+1,4)}">
@@ -45,3 +48,24 @@ document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLower
 header();footer();
 ES.ready.then(()=>{header();footer()});
 ES.onChange(()=>{header();footer()});
+
+// ---- Login screen (same account as the admin panel) ----
+window.esShowLogin=msg=>{
+  if(document.getElementById('es-login'))return;
+  const d=document.createElement('div');d.id='es-login';d.className='login-bg fixed inset-0 z-[100] flex items-center justify-center px-4 overflow-hidden';
+  d.innerHTML=`<span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+  <div class="relative w-full max-w-sm"><form class="login-card bg-white/90 backdrop-blur border border-white rounded-3xl p-8 shadow-2xl">
+  <div class="text-center mb-6"><img src="logo.png" width="64" height="64" class="logo-float h-16 w-16 rounded-2xl mx-auto mb-4 shadow-lg" alt=""><h1 class="text-2xl font-bold">Welcome</h1><p class="text-sm text-on-surface-variant">Sign in to Edit Simple Libraries</p></div>
+  <div class="stagger"><label class="text-sm font-medium">Email</label><div class="relative mt-1 mb-4"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">mail</span><input name="email" type="email" autocomplete="username" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10"></div></div>
+  <div class="stagger"><label class="text-sm font-medium">Password</label><div class="relative mt-1 mb-6"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">lock</span><input name="password" type="password" autocomplete="current-password" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10"></div></div>
+  <div class="stagger"><button class="relative w-full bg-primary text-on-primary rounded-xl py-3 font-semibold hover:brightness-95 active:scale-[.98] transition"><span class="lbl">Log in</span><span class="spin hidden absolute inset-0 grid place-items-center"><span class="spinner"></span></span></button>
+  <p class="err text-sm text-error mt-3 text-center min-h-[20px]">${esc(msg||'')}</p><a href="admin.html" class="block text-center text-sm text-primary font-medium hover:underline">Forgot password?</a></div></form>
+  <div class="ok hidden login-card bg-white/90 backdrop-blur rounded-3xl p-10 shadow-2xl text-center"><svg class="check mx-auto" viewBox="0 0 52 52" width="72" height="72"><circle cx="26" cy="26" r="24" fill="none" stroke="#16a34a" stroke-width="3"/><path fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27l7 7 15-15"/></svg><p class="text-xl font-bold mt-4">Signed in</p><p class="text-sm text-on-surface-variant">Loading the library…</p></div></div>`;
+  document.body.appendChild(d);document.documentElement.style.overflow='hidden';
+  const f=d.querySelector('form'),b=f.querySelector('button'),err=f.querySelector('.err');f.email.focus();
+  f.onsubmit=async e=>{e.preventDefault();err.textContent='';b.disabled=true;b.querySelector('.lbl').classList.add('invisible');b.querySelector('.spin').classList.remove('hidden');
+    const m=await ES.login(f.email.value.trim(),f.password.value);
+    b.disabled=false;b.querySelector('.lbl').classList.remove('invisible');b.querySelector('.spin').classList.add('hidden');
+    if(m){err.textContent=m;f.classList.remove('shake');void f.offsetWidth;f.classList.add('shake');return}
+    f.classList.add('hidden');d.querySelector('.ok').classList.remove('hidden');setTimeout(()=>location.reload(),900)};
+};

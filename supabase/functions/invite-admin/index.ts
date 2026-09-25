@@ -22,18 +22,15 @@ Deno.serve(async (req) => {
     if (!/^\S+@\S+\.\S+$/.test(e)) return json({ error: "Invalid email" }, 400);
     if (!["admin", "superadmin"].includes(role)) return json({ error: "Invalid role" }, 400);
 
+    // add_admin enforces all role rules: existing user → role granted now; new email → saved as pending invite
+    const { data: res, error: ae } = await caller.rpc("add_admin", { p_email: e, p_role: role });
+    if (ae) return json({ error: ae.message }, 400);
+    if (res === "added") return json({ status: "added", note: "User already has an account — role granted" });
+
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    // Save role first (trigger grants it when the invited user is created)
-    const { error: ie } = await admin.from("admin_invites").upsert({ email: e, role });
-    if (ie) return json({ error: ie.message }, 400);
     const { error } = await admin.auth.admin.inviteUserByEmail(e, { redirectTo });
     if (error) {
-      // Already registered → just grant the role directly
-      if (/already|registered|exists/i.test(error.message)) {
-        const { data, error: ae } = await caller.rpc("add_admin", { p_email: e, p_role: role });
-        if (ae) return json({ error: ae.message }, 400);
-        return json({ status: data === "added" ? "added" : "invited", note: "User already exists — role granted" });
-      }
+      await admin.from("admin_invites").delete().eq("email", e);
       return json({ error: error.message }, 400);
     }
     return json({ status: "sent" });
