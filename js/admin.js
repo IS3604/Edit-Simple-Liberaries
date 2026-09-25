@@ -55,6 +55,7 @@ async function handleLink() {
 }
 let linkType = null;
 async function boot(skipLink) {
+  await window.ES_MAINT;
   if (!skipLink) { linkType = await handleLink(); if (linkType === 'stop') return; }
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return show('login');
@@ -174,7 +175,7 @@ function renderDash() {
 // ---------------- VIDEOS ----------------
 function statusChip(v) {
   const pr = pendReqFor('video', v.id);
-  const map = { approved: v.published ? ['Live', 'bg-green-100 text-green-800'] : ['Hidden', 'bg-surface-container text-on-surface-variant'], pending: ['Pending review', 'bg-amber-100 text-amber-800'], rejected: ['Rejected', 'bg-red-100 text-red-800'] };
+  const map = { approved: v.published ? ['Live', 'bg-green-100 text-green-800'] : ['Draft', 'bg-surface-container text-on-surface-variant'], pending: ['Pending review', 'bg-amber-100 text-amber-800'], rejected: ['Rejected', 'bg-red-100 text-red-800'] };
   const [l, c] = map[v.status] || map.pending;
   return `<span class="inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${c}">${l}</span>${pr ? `<span class="block mt-1 text-[11px] text-amber-700">Change ${pr.action} pending</span>` : ''}${v.status === 'rejected' && v.review_note ? `<span class="block mt-1 text-[11px] text-red-700 max-w-[160px]">“${esc(v.review_note)}”</span>` : ''}`;
 }
@@ -183,17 +184,29 @@ const dupSet = () => { const n = {}; videos.forEach(v => v.file_hash && (n[v.fil
 function renderVideos() {
   const q = $('#vq').value.toLowerCase().trim(), c = $('#vcat').value, s = $('#vstat').value, dups = dupSet();
   const list = videos.filter(v => (!q || (v.search_text || (v.title + ' ' + (v.tags || []).join(' '))).toLowerCase().includes(q)) && (!c || v.category === c || v.subcategory === c) &&
-    (!s || (s === 'live' && isLive(v)) || (s === 'hidden' && v.status === 'approved' && !v.published) || s === v.status || (s === 'mine' && v.submitted_by === me.id) || (s === 'dup' && dups.has(v.file_hash))));
+    (!s || (s === 'live' && isLive(v)) || (s === 'draft' && v.status === 'approved' && !v.published) || s === v.status || (s === 'mine' && v.submitted_by === me.id) || (s === 'dup' && dups.has(v.file_hash))));
+  // Duplicates view: group each file together — Original (first upload) then its variants in upload order
+  const grp = {};
+  if (s === 'dup') {
+    const first = {}; list.forEach(v => { const t = +new Date(v.created_at); if (!(v.file_hash in first) || t < first[v.file_hash]) first[v.file_hash] = t; });
+    list.sort((a, b) => first[a.file_hash] - first[b.file_hash] || String(a.file_hash).localeCompare(String(b.file_hash)) || new Date(a.created_at) - new Date(b.created_at));
+    list.forEach(v => (grp[v.file_hash] = grp[v.file_hash] || []).push(v));
+  }
+  const cols = isSuper() ? 5 : 4;
+  const groupHead = v => { const g = grp[v.file_hash]; if (!g || g[0] !== v) return '';
+    return `<tr class="bg-amber-50/70 border-b border-amber-200"><td colspan="${cols}" class="px-3 py-2 text-xs font-semibold text-amber-900"><span class="material-symbols-outlined !text-sm align-middle mr-1">content_copy</span>Same file · ${g.length} copies · original: “${esc(v.title)}”</td></tr>`; };
+  const role_ = v => { const g = grp[v.file_hash]; if (!g) return ''; const i = g.indexOf(v);
+    return i === 0 ? '<span class="inline-block text-[10px] font-bold uppercase bg-green-100 text-green-800 px-1.5 py-0.5 rounded mr-1">Original</span>' : `<span class="inline-block text-[10px] font-bold uppercase bg-surface-container text-on-surface-variant px-1.5 py-0.5 rounded mr-1">Variant ${i}</span>`; };
   $('#vempty').classList.toggle('hidden', list.length > 0);
-  $('#vrows').innerHTML = list.map(v => `<tr class="border-b border-outline-variant/30 last:border-0 align-top">
+  $('#vrows').innerHTML = list.map(v => groupHead(v) + `<tr data-vrow="${v.id}" class="${grp[v.file_hash] && grp[v.file_hash][0] !== v ? 'dupvar ' : ''}border-b border-outline-variant/30 last:border-0 align-top">
     <td class="p-3"><div class="flex items-center gap-3"><button data-play="${v.id}" class="relative w-24 aspect-video rounded-md bg-surface-container overflow-hidden shrink-0" aria-label="Preview">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" loading="lazy" class="w-full h-full object-cover" alt="">` : ''}<span class="material-symbols-outlined absolute inset-0 m-auto h-fit w-fit text-white drop-shadow !text-xl">play_circle</span></button>
-      <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${esc(v.title)}</p>${dups.has(v.file_hash) ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded mt-0.5"><span class="material-symbols-outlined !text-xs">content_copy</span>Duplicate</span>' : ''}<p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
+      <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${role_(v)}${esc(v.title)}</p>${dups.has(v.file_hash) && s !== 'dup' ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded mt-0.5"><span class="material-symbols-outlined !text-xs">content_copy</span>Duplicate</span>' : ''}<p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
     <td class="p-3 whitespace-nowrap">${esc(cname(v.category))}<br><span class="text-xs text-on-surface-variant">${esc(cname(v.subcategory))}</span></td>
     <td class="p-3 whitespace-nowrap text-xs">${esc(v.resolution)} · ${v.fps}fps<br>${dur(v.duration_seconds)} · ${esc(v.orientation)}</td>
     <td class="p-3">${statusChip(v)}</td>
     ${isSuper() ? `<td class="p-3 text-right whitespace-nowrap">
       ${v.status === 'pending' ? `<button data-approve="${v.id}" title="Approve" class="material-symbols-outlined p-1.5 rounded hover:bg-green-50 text-green-700">check_circle</button><button data-reject="${v.id}" title="Reject" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">cancel</button>` : ''}
-      ${v.status === 'approved' ? `<button data-pub="${v.id}" title="${v.published ? 'Hide from site' : 'Show on site'}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">${v.published ? 'visibility_off' : 'visibility'}</button>` : ''}
+      ${v.status === 'approved' ? `<button data-pub="${v.id}" title="${v.published ? 'Move to draft (hide from site)' : 'Publish on site'}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">${v.published ? 'visibility_off' : 'visibility'}</button>` : ''}
       <button data-edit="${v.id}" title="Edit" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container">edit</button>
       <button data-del="${v.id}" title="Delete" class="material-symbols-outlined p-1.5 rounded hover:bg-red-50 text-error">delete</button>
 </td>` : ''}</tr>`).join('');
@@ -207,7 +220,7 @@ $('#vrows').onclick = async e => {
   if (d.edit) return openVideo(v);
   if (d.approve) return reviewVideo(v, true);
   if (d.reject) return reviewVideo(v, false);
-  if (d.pub) { const { error } = await sb.from('videos').update({ published: !v.published }).eq('id', v.id); if (error) return toast(error.message, 1); toast(v.published ? 'Hidden from website' : 'Now visible on website'); return loadAll(); }
+  if (d.pub) { const { error } = await sb.from('videos').update({ published: !v.published }).eq('id', v.id); if (error) return toast(error.message, 1); toast(v.published ? 'Moved to Draft — hidden from website' : 'Now live on website'); return loadAll(); }
   if (d.del) {
     if (!confirm(`Delete "${v.title}"? This also removes its uploaded files.`)) return;
     const paths = [v.video_url, v.thumbnail_url].map(storagePath).filter(Boolean); if (paths.length) await sb.storage.from('videos').remove(paths);
@@ -306,7 +319,7 @@ $('#vdrop').addEventListener('click', e => { if (e.target.closest('video') || e.
 $('#vchange').onclick = e => { e.stopPropagation(); $('#vform').vfile.click(); };
 // ---- Duplicate warning (same file already uploaded) ----
 const catLabel = v => `${cname(v.category)} › ${cname(v.subcategory)}`;
-const stLabel = v => ({ pending: ['Pending', 'bg-amber-100 text-amber-800'], rejected: ['Rejected', 'bg-red-100 text-red-800'], approved: v.published ? ['Live', 'bg-green-100 text-green-800'] : ['Hidden', 'bg-surface-container text-on-surface-variant'] }[v.status] || ['', '']);
+const stLabel = v => ({ pending: ['Pending', 'bg-amber-100 text-amber-800'], rejected: ['Rejected', 'bg-red-100 text-red-800'], approved: v.published ? ['Live', 'bg-green-100 text-green-800'] : ['Draft', 'bg-surface-container text-on-surface-variant'] }[v.status] || ['', '']);
 async function checkDuplicate(h) {
   const { data } = await sb.from('videos').select('id,title,category,subcategory,status,published,thumbnail_url,video_url,created_at,submitted_by').eq('file_hash', h);
   const hits = (data || []).filter(v => v.id !== editing?.id);
@@ -504,7 +517,7 @@ function renderGuide() {
 function renderMyReq() {
   if (isSuper()) return;
   const mv = videos.filter(v => v.submitted_by === me.id);
-  const chip = v => ({ pending: ['Waiting for review', 'bg-amber-100 text-amber-800', 'hourglass_top'], approved: [v.published ? 'Approved · Live' : 'Approved · Hidden', 'bg-green-100 text-green-800', 'check_circle'], rejected: ['Rejected', 'bg-red-100 text-red-800', 'block'] }[v.status] || ['Pending', 'bg-amber-100 text-amber-800', 'hourglass_top']);
+  const chip = v => ({ pending: ['Waiting for review', 'bg-amber-100 text-amber-800', 'hourglass_top'], approved: [v.published ? 'Approved · Live' : 'Approved · Draft', 'bg-green-100 text-green-800', 'check_circle'], rejected: ['Rejected', 'bg-red-100 text-red-800', 'block'] }[v.status] || ['Pending', 'bg-amber-100 text-amber-800', 'hourglass_top']);
   $('#myReq').innerHTML = mv.map(v => { const [l, c, i] = chip(v); return `<div class="bg-white rounded-xl border border-outline-variant/40 p-4">
     <div class="flex items-center gap-3"><button data-play="${v.id}" class="w-24 aspect-video rounded bg-surface-container overflow-hidden shrink-0">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}</button>
     <div class="flex-1 min-w-0"><p class="font-medium truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${esc(cname(v.category))} › ${esc(cname(v.subcategory))} · ${new Date(v.created_at).toLocaleString()}</p></div>

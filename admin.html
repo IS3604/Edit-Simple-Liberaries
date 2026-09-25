@@ -46,7 +46,7 @@
 
 <!-- APP -->
 <div id="app" style="display:none" class="min-h-screen md:flex">
-<aside class="md:w-64 md:shrink-0 bg-white border-b md:border-b-0 md:border-r border-outline-variant/40 md:min-h-screen md:sticky md:top-0 md:h-screen flex md:flex-col">
+<aside class="sticky top-0 z-40 md:w-64 md:shrink-0 bg-white border-b md:border-b-0 md:border-r border-outline-variant/40 md:min-h-screen md:sticky md:top-0 md:h-screen flex md:flex-col">
 <div class="hidden md:flex items-center gap-3 px-5 h-16 bg-primary-fixed text-on-surface border-b border-orange-200"><img src="logo.png" width="36" height="36" class="h-9 w-9 rounded-lg ring-2 ring-white" alt=""><div><p class="font-bold text-sm leading-tight">Edit Simple</p><p class="text-[11px] text-on-surface-variant uppercase tracking-wide">Admin panel</p></div></div>
 <nav id="tabs" class="flex md:flex-col gap-1 p-2 md:p-3 overflow-x-auto flex-1"></nav>
 <div class="hidden md:block p-3 border-t border-outline-variant/40"><div class="px-3 py-2 mb-1"><p id="meEmail" class="text-sm font-medium truncate"></p><span id="meRole" class="inline-block mt-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"></span></div>
@@ -61,9 +61,9 @@
 
 <section id="t-videos" class="hidden"><div class="flex flex-wrap items-center justify-between gap-3 mb-6"><h1 class="text-2xl font-bold">Videos</h1>
 <button id="newVideo" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add video</button></div>
-<div class="flex flex-wrap gap-2 mb-4"><input id="vq" type="search" placeholder="Search title, content, tags…" class="rounded-lg border-outline-variant flex-1 min-w-[180px] focus:ring-primary"><select id="vcat" class="rounded-lg border-outline-variant focus:ring-primary"></select>
-<select id="vstat" class="rounded-lg border-outline-variant focus:ring-primary"><option value="">All status</option><option value="live">Live</option><option value="hidden">Hidden</option><option value="pending">Pending review</option><option value="rejected">Rejected</option><option value="mine">My uploads</option><option value="dup">Duplicates</option></select></div>
-<div class="overflow-x-auto bg-white rounded-xl border border-outline-variant/40"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Video</th><th class="p-3">Category</th><th class="p-3">Specs</th><th class="p-3">Status</th><th id="vActTh" class="p-3 text-right">Actions</th></tr></thead><tbody id="vrows"></tbody></table></div>
+<div class="flex flex-wrap gap-2 mb-4"><input id="vq" type="search" placeholder="Search title, content, tags…" class="rounded-lg border-outline-variant basis-full sm:basis-auto flex-1 min-w-[180px] focus:ring-primary"><select id="vcat" class="flex-1 sm:flex-none min-w-0 rounded-lg border-outline-variant focus:ring-primary"></select>
+<select id="vstat" class="flex-1 sm:flex-none min-w-0 rounded-lg border-outline-variant focus:ring-primary"><option value="">All status</option><option value="live">Live</option><option value="draft">Draft</option><option value="pending">Pending review</option><option value="rejected">Rejected</option><option value="mine">My uploads</option><option value="dup">Duplicates</option></select></div>
+<div class="overflow-x-auto bg-white rounded-xl border border-outline-variant/40"><table class="mtable w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Video</th><th class="p-3">Category</th><th class="p-3">Specs</th><th class="p-3">Status</th><th id="vActTh" class="p-3 text-right">Actions</th></tr></thead><tbody id="vrows"></tbody></table></div>
 <p id="vempty" class="hidden text-center text-on-surface-variant py-12">No videos match.</p></section>
 
 <section id="t-guide" class="hidden"><h1 class="text-2xl font-bold mb-1">Upload guide</h1><p class="text-on-surface-variant mb-6">Everything you need to get your videos approved quickly.</p><div id="guide"></div></section>
@@ -150,5 +150,5 @@
 <!-- PREVIEW MODAL -->
 <div id="pmodal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div class="w-full max-w-3xl"><div class="flex justify-end mb-2"><button data-close class="material-symbols-outlined text-white" aria-label="Close">close</button></div><video id="pvid" controls class="w-full rounded-xl bg-black max-h-[80vh]"></video></div></div>
 
-<script src="js/config.js"></script><script src="js/reset-cooldown.js"></script><script src="js/admin.js" type="module"></script>
+<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/admin.js" type="module"></script>
 </body></html>

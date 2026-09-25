@@ -27,6 +27,7 @@ async function client(){
 // ---- Login gate: nothing loads until a team member is signed in ----
 let USER=null,ROLE=null;
 async function gate(){
+  await window.ES_MAINT;
   const s=await client(); if(!s) return true;            // sample-data mode (no Supabase configured)
   const {data:{session}}=await s.auth.getSession();
   if(session){const {data:r}=await s.rpc('my_role'); if(r){USER=session.user;ROLE=r;return true}

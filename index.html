@@ -10,37 +10,48 @@
 <header id="es-header" class="sticky top-0 z-50 w-full h-16 bg-primary-fixed border-b border-orange-200"></header>
 <main>
 <section class="border-b border-outline-variant/40 bg-surface-container-lowest">
-<div class="max-w-4xl mx-auto px-4 pt-16 md:pt-20 pb-14 text-center">
-<h1 class="text-4xl md:text-6xl font-bold tracking-tight leading-tight">Videos Made for<br><span class="text-primary">Lawyers &amp; Doctors.</span></h1>
-<p class="mt-5 text-lg text-on-surface-variant">Ready-to-use footage for your practice's website, ads and social media.</p>
+<div class="max-w-4xl mx-auto px-4 pt-10 sm:pt-16 md:pt-20 pb-10 sm:pb-14 text-center">
+<span class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider bg-primary-fixed text-on-primary-fixed-variant px-3 py-1 rounded-full"><span class="material-symbols-outlined !text-base">movie</span>Legal &amp; medical stock footage</span>
+<h1 class="mt-5 text-[2.1rem] leading-[1.15] sm:text-5xl md:text-6xl font-bold tracking-tight md:leading-tight">Footage that builds trust<br class="hidden sm:block"> <span class="text-primary">before the first appointment.</span></h1>
+<p class="mt-5 text-base sm:text-lg text-on-surface-variant max-w-2xl mx-auto">Courtrooms, clinics and real client moments — search our curated library and drop the right clip into your website, ads or reels in minutes.</p>
 <form id="hero-search" role="search" class="mt-10 flex flex-col sm:flex-row gap-2 bg-white p-2 rounded-2xl shadow-lg border border-outline-variant/60">
 <select name="cat" aria-label="Category" class="bg-surface-container-low rounded-xl px-4 py-3 text-sm font-medium border-0 focus:ring-primary"><option value="">All categories</option></select>
 <input name="q" aria-label="Search" class="flex-1 px-4 py-3 bg-transparent border-0 focus:ring-0" placeholder="Search by title or keyword…">
 <button class="bg-primary text-on-primary px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:brightness-95">Search<span class="material-symbols-outlined !text-lg">arrow_forward</span></button></form>
 </div></section>
-<section class="max-w-7xl mx-auto px-4 md:px-6 mt-14">
-<h2 class="text-2xl md:text-3xl font-bold mb-2">Browse by Category</h2>
-<p class="text-on-surface-variant mb-8">Pick your profession, then narrow down by subcategory.</p>
-<div id="cats" class="grid gap-6 md:grid-cols-3"></div></section>
-<section class="max-w-7xl mx-auto px-4 md:px-6 mt-20">
-<div class="flex items-end justify-between mb-6"><div><h2 class="text-2xl md:text-3xl font-bold">Latest Videos</h2><p class="text-on-surface-variant">Freshly added to the library.</p></div><a href="videos.html" class="text-primary font-semibold text-sm flex items-center">View all<span class="material-symbols-outlined">chevron_right</span></a></div>
+<section class="max-w-7xl mx-auto px-4 md:px-6 mt-10 sm:mt-14">
+<div class="flex items-end justify-between gap-4 mb-6 sm:mb-8"><div><h2 class="text-2xl md:text-3xl font-bold">Browse by practice</h2><p class="text-on-surface-variant mt-1">Pick your field, then jump straight to the scene you need.</p></div></div>
+<div id="cats" class="grid gap-5 md:gap-6 md:grid-cols-3"></div></section>
+<section class="max-w-7xl mx-auto px-4 md:px-6 mt-14 sm:mt-20">
+<div class="flex items-end justify-between gap-4 mb-6"><div><h2 class="text-2xl md:text-3xl font-bold">Latest Videos</h2><p class="text-on-surface-variant">Freshly added to the library.</p></div><a href="videos.html" class="text-primary font-semibold text-sm flex items-center shrink-0">View all<span class="material-symbols-outlined">chevron_right</span></a></div>
 <div id="latest" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div></section>
 </main>
-<script src="js/config.js"></script><script src="js/reset-cooldown.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
+<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
 <script>
 (()=>{
 const f=document.getElementById('hero-search'),cats=document.getElementById('cats'),latest=document.getElementById('latest');
 latest.innerHTML=esSkel(6);
-const catSkel=`<div class="rounded-3xl bg-surface-container-lowest border border-outline-variant/40 p-6"><div class="sk h-12 w-12 mb-4"></div><div class="sk h-5 w-1/2 mb-2"></div><div class="sk h-3 w-full mb-1"></div><div class="sk h-3 w-2/3 mb-4"></div><div class="flex gap-2"><div class="sk h-6 w-20"></div><div class="sk h-6 w-24"></div><div class="sk h-6 w-16"></div></div></div>`;
+const catSkel=`<div class="rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40"><div class="sk aspect-[16/10] !rounded-none"></div><div class="p-5"><div class="sk h-3 w-full mb-1"></div><div class="sk h-3 w-2/3 mb-4"></div><div class="flex gap-2"><div class="sk h-7 w-20"></div><div class="sk h-7 w-24"></div><div class="sk h-7 w-16"></div></div></div></div>`;
+const G={lawyers:'from-orange-400 via-amber-500 to-orange-700',doctors:'from-rose-300 via-orange-400 to-amber-600',both:'from-amber-300 via-orange-400 to-rose-500'};
+const mosaic=(c,th)=>{const t=th.filter(v=>v.thumbnail_url).slice(0,3);
+ if(!t.length)return `<span class="material-symbols-outlined absolute right-5 top-4 text-white/25 !text-[120px] leading-none" aria-hidden="true">${c.icon}</span>`;
+ const img=(v,cl)=>`<img src="${esEsc(v.thumbnail_url)}" alt="" loading="lazy" decoding="async" class="${cl} w-full h-full object-cover">`;
+ return t.length<3?img(t[0],'absolute inset-0'):`<div class="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-0.5">${img(t[0],'col-span-2 row-span-2')}${img(t[1],'')}${img(t[2],'')}</div>`};
+const card=(c,n,th)=>`<article class="cat-card group flex flex-col rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-primary/40 transition-all duration-300">
+ <a href="videos.html?cat=${c.slug}" class="cat-media relative block aspect-[16/10] bg-gradient-to-br ${G[c.slug]||G.both} overflow-hidden" aria-label="Browse ${esEsc(c.name)}">${mosaic(c,th)}
+  <span class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent"></span>
+  <span class="absolute top-3 right-3 text-[11px] font-bold bg-white/95 text-on-surface px-2.5 py-1 rounded-full shadow">${n} video${n===1?'':'s'}</span>
+  <span class="absolute left-4 right-4 bottom-4 flex items-center gap-3 text-white"><span class="w-11 h-11 shrink-0 rounded-2xl bg-white/20 backdrop-blur grid place-items-center ring-1 ring-white/40"><span class="material-symbols-outlined">${c.icon}</span></span><span class="text-xl sm:text-2xl font-bold font-display leading-tight drop-shadow">${esEsc(c.name)}</span></span></a>
+ <div class="p-5 flex flex-col flex-1">
+  <p class="text-sm text-on-surface-variant">${esEsc(c.blurb)}</p>
+  <div class="flex gap-2 mt-4 -mx-5 px-5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">${c.subs.map(([s,nm])=>`<a href="videos.html?cat=${c.slug}&sub=${s}" class="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-surface-container hover:bg-primary hover:text-on-primary transition">${esEsc(nm)}</a>`).join('')}</div>
+  <a href="videos.html?cat=${c.slug}" class="mt-auto pt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary">Explore ${esEsc(c.name.replace(/^For /,'').toLowerCase())} footage<span class="material-symbols-outlined !text-lg group-hover:translate-x-1 transition-transform">arrow_forward</span></a></div></article>`;
 cats.innerHTML=catSkel.repeat(3);
 f.onsubmit=e=>{e.preventDefault();const p=new URLSearchParams();if(f.cat.value)p.set('cat',f.cat.value);if(f.q.value.trim())p.set('q',f.q.value.trim());location.href='videos.html?'+p};
 const render=async()=>{
  f.cat.innerHTML='<option value="">All categories</option>'+ES.CATS.map(c=>`<option value="${c.slug}">${esEsc(c.name)}</option>`).join('');
- const [n,vids]=await Promise.all([ES.counts(),ES.listVideos({limit:6})]);
- cats.innerHTML=ES.CATS.map(c=>`<div class="rounded-3xl bg-surface-container-lowest border border-outline-variant/40 p-6 hover:shadow-xl hover:border-primary/40 transition">
- <a href="videos.html?cat=${c.slug}" class="flex items-center justify-between mb-4"><span class="w-12 h-12 rounded-2xl bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${c.icon}</span></span><span class="text-xs font-semibold text-on-surface-variant">${n[c.slug]||0} videos</span></a>
- <a href="videos.html?cat=${c.slug}"><h3 class="text-xl font-bold hover:text-primary">${esEsc(c.name)}</h3></a><p class="text-sm text-on-surface-variant mt-1 mb-4">${esEsc(c.blurb)}</p>
- <div class="flex flex-wrap gap-2">${c.subs.map(([s,nm])=>`<a href="videos.html?cat=${c.slug}&sub=${s}" class="text-xs px-3 py-1.5 rounded-full bg-surface-container hover:bg-primary hover:text-on-primary transition">${esEsc(nm)}</a>`).join('')}</div></div>`).join('');
+ const [n,vids,...th]=await Promise.all([ES.counts(),ES.listVideos({limit:6}),...ES.CATS.map(c=>ES.listVideos({category:c.slug,limit:3}))]);
+ cats.innerHTML=ES.CATS.map((c,i)=>card(c,n[c.slug]||0,th[i]||[])).join('');
  latest.innerHTML=vids.length?vids.map(esCard).join(''):'<p class="col-span-full text-center text-on-surface-variant py-12">New videos coming soon.</p>';esHoverPlay(latest);
 };
 ES.ready.then(render);ES.onChange(render);

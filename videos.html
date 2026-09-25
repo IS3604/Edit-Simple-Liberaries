@@ -12,19 +12,19 @@
 <nav id="crumbs" aria-label="Breadcrumb" class="text-sm text-on-surface-variant flex flex-wrap items-center gap-1 mb-6 min-h-[20px]"></nav>
 <h1 id="title" class="text-3xl md:text-5xl font-bold tracking-tight">All Videos</h1>
 <p id="blurb" class="mt-3 text-on-surface-variant max-w-2xl">Royalty-free stock videos for lawyers, doctors and professional practices.</p>
-<div id="cattabs" class="mt-8 flex flex-wrap gap-2 min-h-[40px]"></div>
-<div id="subtabs" class="mt-3 flex flex-wrap gap-2"></div>
+<div id="cattabs" class="mt-6 sm:mt-8 -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:flex-wrap gap-2 min-h-[40px] overflow-x-auto no-scrollbar [&>a]:shrink-0 [&>a]:whitespace-nowrap"></div>
+<div id="subtabs" class="mt-3 -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:flex-wrap gap-2 overflow-x-auto no-scrollbar [&>a]:shrink-0 [&>a]:whitespace-nowrap"></div>
 <div class="mt-6 flex flex-col sm:flex-row gap-3">
 <label class="flex-1 flex items-center gap-2 bg-white border border-outline-variant/70 rounded-xl px-4 focus-within:ring-2 focus-within:ring-primary"><span class="material-symbols-outlined text-on-surface-variant">search</span><input id="q" type="search" aria-label="Search videos" class="flex-1 py-3 bg-transparent border-0 focus:ring-0" placeholder="Search what's in the video, title or tags…"></label>
-<select id="sort" aria-label="Sort" class="rounded-xl border-outline-variant/70 bg-white px-4 py-3 text-sm focus:ring-primary"><option value="rel">Best match</option><option value="new">Newest</option><option value="short">Shortest</option><option value="long">Longest</option><option value="az">A–Z</option></select>
-<select id="res" aria-label="Resolution" class="rounded-xl border-outline-variant/70 bg-white px-4 py-3 text-sm focus:ring-primary"><option value="">Any resolution</option><option>4K</option><option>1080p</option><option>720p</option></select>
-<select id="ori" aria-label="Orientation" class="rounded-xl border-outline-variant/70 bg-white px-4 py-3 text-sm focus:ring-primary"><option value="">Any orientation</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option><option value="square">Square</option></select></div>
+<div class="grid grid-cols-3 gap-2 sm:flex sm:gap-3"><select id="sort" aria-label="Sort" class="rounded-xl border-outline-variant/70 bg-white px-3 sm:px-4 py-3 text-sm min-w-0 w-full sm:w-auto focus:ring-primary"><option value="rel">Best match</option><option value="new">Newest</option><option value="short">Shortest</option><option value="long">Longest</option><option value="az">A–Z</option></select>
+<select id="res" aria-label="Resolution" class="rounded-xl border-outline-variant/70 bg-white px-3 sm:px-4 py-3 text-sm min-w-0 w-full sm:w-auto focus:ring-primary"><option value="">Any resolution</option><option>4K</option><option>1080p</option><option>720p</option></select>
+<select id="ori" aria-label="Orientation" class="rounded-xl border-outline-variant/70 bg-white px-3 sm:px-4 py-3 text-sm min-w-0 w-full sm:w-auto focus:ring-primary"><option value="">Any orientation</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option><option value="square">Square</option></select></div></div>
 <p id="count" class="mt-4 text-sm text-on-surface-variant min-h-[20px]" aria-live="polite"></p>
 <div id="grid" class="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
 <div id="empty" class="hidden text-center py-20 text-on-surface-variant"><span class="material-symbols-outlined !text-5xl">videocam_off</span><p class="mt-2">No videos found. Try different words or another subcategory.</p></div>
 <div class="text-center mt-10"><button id="more" class="hidden px-6 py-3 rounded-full border border-outline-variant font-semibold hover:border-primary hover:text-primary">Load more</button></div>
 </main>
-<script src="js/config.js"></script><script src="js/reset-cooldown.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
+<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
 <script>
 (()=>{
 const P=new URLSearchParams(location.search);let cat=P.get('cat')||'',sub=P.get('sub')||'';const qi=document.getElementById('q');qi.value=P.get('q')||'';

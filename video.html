@@ -11,7 +11,7 @@
 <main class="max-w-7xl mx-auto px-4 md:px-6 pt-8" id="root">
 <div class="sk h-4 w-64 mb-6"></div><div class="grid lg:grid-cols-12 gap-8"><div class="lg:col-span-8"><div class="sk aspect-video !rounded-2xl"></div><div class="sk h-8 w-2/3 mt-6"></div><div class="sk h-4 w-full mt-4"></div><div class="sk h-4 w-5/6 mt-2"></div>
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6"><div class="sk h-16"></div><div class="sk h-16"></div><div class="sk h-16"></div><div class="sk h-16"></div></div></div><div class="lg:col-span-4"><div class="sk h-56 !rounded-2xl"></div></div></div></main>
-<script src="js/config.js"></script><script src="js/reset-cooldown.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
+<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
 <script>
 let first=true;const render=async()=>{const id=new URLSearchParams(location.search).get('id');const v=id&&await ES.getVideo(id);const root=document.getElementById('root');
 if(!v){root.innerHTML='<div class="text-center py-24"><h1 class="text-2xl font-bold">Video not found</h1><a href="videos.html" class="text-primary font-semibold mt-4 inline-block">Browse all videos</a></div>';return}
