@@ -22,12 +22,12 @@
 <div class="stagger"><label class="text-sm font-medium">Password</label>
 <div class="relative mt-1 mb-6"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">lock</span><input name="password" type="password" autocomplete="current-password" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10 pr-10"><button type="button" id="pwEye" class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl" aria-label="Show password">visibility</button></div></div>
 <div class="stagger"><button id="loginBtn" class="relative w-full bg-primary text-on-primary rounded-xl py-3 font-semibold hover:brightness-95 active:scale-[.98] transition overflow-hidden"><span class="lbl">Log in</span><span class="spin hidden absolute inset-0 grid place-items-center"><span class="spinner"></span></span></button>
-<p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]"></p>
+<p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]" role="alert"></p>
 <button type="button" id="forgotBtn" class="block mx-auto text-sm text-primary font-medium hover:underline">Forgot password?</button></div></form>
 <div id="loginOk" class="hidden login-card bg-white/90 backdrop-blur rounded-3xl p-10 shadow-2xl text-center">
 <svg class="check mx-auto" viewBox="0 0 52 52" width="72" height="72"><circle cx="26" cy="26" r="24" fill="none" stroke="#16a34a" stroke-width="3"/><path fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27l7 7 15-15"/></svg>
 <p class="text-xl font-bold mt-4">Signed in</p><p class="text-sm text-on-surface-variant">Loading your dashboard…</p></div>
-<a href="index.html" class="block text-center text-sm text-on-surface-variant mt-6 hover:text-primary">← Back to website</a></div></div>
+</div></div>
 
 <!-- SET PASSWORD (invite / reset / first login) -->
 <div id="setpw" style="display:none" class="min-h-screen flex items-center justify-center px-4 bg-surface-container-low">
@@ -157,5 +157,5 @@
 <!-- PREVIEW MODAL -->
 <div id="pmodal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div class="w-full max-w-3xl"><div class="flex justify-end mb-2"><button data-close class="material-symbols-outlined text-white" aria-label="Close">close</button></div><video id="pvid" controls class="w-full rounded-xl bg-black max-h-[80vh]"></video></div></div>
 
-<script src="js/config.js"></script><script src="js/admin.js" type="module"></script>
+<script src="js/config.js"></script><script src="js/reset-cooldown.js"></script><script src="js/admin.js" type="module"></script>
 </body></html>

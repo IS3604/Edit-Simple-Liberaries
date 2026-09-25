@@ -34,8 +34,9 @@ async function gate(){
   return waitLogin();
 }
 function waitLogin(msg){ const show=()=>window.esShowLogin?.(msg); document.readyState==='loading'?document.addEventListener('DOMContentLoaded',show):setTimeout(show); return new Promise(()=>{}); }
-async function login(email,password){const s=await client();const {error}=await s.auth.signInWithPassword({email,password});if(error)return error.message;
-  const {data:r}=await s.rpc('my_role');if(!r){await s.auth.signOut();return 'This account has no access. Ask a superadmin to add you.'}return null}
+async function login(email,password){if(esLock.left()>0)return `Too many attempts. Try again in ${esLock.left()}s.`;const s=await client();const {error}=await s.auth.signInWithPassword({email,password});if(error)return esLock.fail(error.message);
+  const {data:r}=await s.rpc('my_role');if(!r){await s.auth.signOut();return 'This account has no access. Ask a superadmin to add you.'}esLock.reset();return null}
+async function resetPassword(email){const s=await client();return s.auth.resetPasswordForEmail(email,{redirectTo:new URL('admin.html',location.href).href})}
 async function logout(){const s=await client();if(s)await s.auth.signOut();location.reload()}
 // ---- Private storage: turn stored paths into short-lived signed links ----
 const signed=new Map();  // path -> {url, exp}
@@ -82,7 +83,7 @@ const bump=()=>{clearTimeout(lt);lt=setTimeout(fire,500)};
 async function onChange(cb){subs.push(cb);if(subs.length>1)return;await ready;
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)bump()});setInterval(()=>{if(!document.hidden)bump()},60000);
   const s=await client();if(!s)return;ch=s.channel('site-live');['videos','categories'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},bump));ch.subscribe();}
-window.ES={CATS,client,onChange,ready,login,logout,downloadUrl,listVideos,getVideo,counts,
+window.ES={CATS,client,onChange,ready,login,logout,resetPassword,downloadUrl,listVideos,getVideo,counts,
   get user(){return USER},get role(){return ROLE},
   cat:slug=>CATS.find(c=>c.slug===slug),
   subName:(c,s)=>(CATS.find(x=>x.slug===c)?.subs.find(x=>x[0]===s)||[,s])[1],

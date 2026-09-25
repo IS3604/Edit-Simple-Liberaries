@@ -34,10 +34,11 @@ $('#setpwForm').onsubmit = async e => {
   if (error) return err.textContent = error.message;
   toast('Password saved'); show('boot'); boot(true);
 };
+const forgotTick = esReset.bind($('#forgotBtn'));
 $('#forgotBtn').onclick = async () => {
-  const email = $('#loginForm').email.value.trim(); if (!email) { $('#loginErr').textContent = 'Enter your email above first.'; return; }
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: ADMIN_URL });
-  if (error) $('#loginErr').textContent = error.message; else toast('Reset link sent — check your inbox');
+  const err = $('#loginErr'); err.textContent = ''; err.classList.replace('text-green-700', 'text-error');
+  const r = await esReset.send(e => sb.auth.resetPasswordForEmail(e, { redirectTo: ADMIN_URL }), $('#loginForm').email.value);
+  err.textContent = r.msg; if (r.ok) err.classList.replace('text-error', 'text-green-700'); forgotTick();
 };
 // Handles links from Supabase emails (invite, signup, magic link, reset, email change)
 async function handleLink() {
@@ -81,14 +82,22 @@ function live() {
 }
 $('#pwEye').onclick = e => { const i = $('#loginForm').password; i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = i.type === 'password' ? 'visibility' : 'visibility_off'; };
 $('#loginForm').onsubmit = async e => {
-  e.preventDefault(); const f = e.target, b = $('#loginBtn'), card = f; $('#loginErr').textContent = '';
+  e.preventDefault(); const f = e.target, b = $('#loginBtn'), card = f, err = $('#loginErr'); err.textContent = ''; err.classList.replace('text-green-700', 'text-error');
+  if (esLock.left() > 0) { err.textContent = `Too many attempts. Try again in ${esLock.left()}s.`; return; }
+  const fail = m => { err.textContent = m; card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); };
   b.disabled = true; b.querySelector('.lbl').classList.add('invisible'); b.querySelector('.spin').classList.remove('hidden');
-  const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
+  let msg = null;
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
+    if (error) msg = esLock.fail(error.message);
+    else { const { data: r } = await sb.rpc('my_role'); if (!r) { await sb.auth.signOut(); msg = 'This account has no admin access. Ask a superadmin to add you.'; } else esLock.reset(); }
+  } catch { msg = 'Could not reach the server. Check your connection and try again.'; }
   b.disabled = false; b.querySelector('.lbl').classList.remove('invisible'); b.querySelector('.spin').classList.add('hidden');
-  if (error) { $('#loginErr').textContent = error.message; card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); return; }
+  if (msg) return fail(msg);
   card.classList.add('hidden'); $('#loginOk').classList.remove('hidden');
   setTimeout(() => { show('boot'); boot(true).then(() => { card.classList.remove('hidden'); $('#loginOk').classList.add('hidden'); f.reset(); }); }, 1100);
 };
+
 const logout = async () => { await sb.auth.signOut(); location.hash = ''; location.reload(); };
 $('#logout').onclick = logout; $('#logoutM').onclick = logout;
 
