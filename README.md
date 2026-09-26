@@ -25,3 +25,6 @@ Free plan max upload = 50 MB per file.
 1. Run `supabase/maintenance.sql` once (SQL Editor).
 2. Table Editor → `site_settings` → set `maintenance` = true (optional `message`). Website + admin show the maintenance page within ~20s; set false to bring back.
 `404.html` is served by GitHub Pages for unknown URLs.
+
+## Unique titles
+Run `supabase/unique-titles.sql` once (after variants.sql). Same file → "Title - Variant N"; different file with a used title → "Title (2)".

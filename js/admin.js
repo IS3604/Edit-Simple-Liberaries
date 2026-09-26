@@ -285,6 +285,22 @@ async function aiReason(res) {
   if (st === 401) return 'not signed in / session expired — log in again';
   return msg.replace(/^Edge Function returned a non-2xx status code$/, `server error ${st || ''}`).slice(0, 200);
 }
+// ---- Unique titles: the FILE decides duplicates; the TITLE just has to be unique ----
+let titleSeq = 0, titleT = null;
+function sameFileOriginal() { return fileHash && videos.filter(v => v.file_hash === fileHash && v.id !== editing?.id).sort((a, b) => a.created_at.localeCompare(b.created_at))[0]; }
+async function checkTitle() {
+  const f = $('#vform'), el = $('#titleHint'), t = f.title.value.trim(), my = ++titleSeq;
+  const hide = () => { el.classList.add('hidden'); el.textContent = ''; };
+  if (!t) return hide();
+  const orig = f.vfile.files[0] && sameFileOriginal();
+  if (orig) { el.className = 'mt-1 text-xs text-amber-800'; el.textContent = `Same video file as “${orig.title}” — it will be saved as a Variant of it.`; return; }
+  if (editing && t === editing.title) return hide();
+  const { data, error } = await sb.rpc('unique_video_title', { t, except_id: editing?.id || null });
+  if (my !== titleSeq) return;
+  if (error || !data || data === t) return hide();
+  el.className = 'mt-1 text-xs text-amber-800'; el.innerHTML = `<span class="material-symbols-outlined !text-sm align-[-3px]">warning</span> Title already used by another video — it will be saved as “<b>${esc(data)}</b>”.`;
+}
+const queueTitle = () => { clearTimeout(titleT); titleT = setTimeout(checkTitle, 350); };
 // ---- AI suggestions (description + tags) via the ai-describe server function (Groq) ----
 async function aiSuggest(force) {
   const f = $('#vform'), stat = $('#aiStat'), btn = $('#aiBtn');
@@ -311,6 +327,7 @@ async function aiSuggest(force) {
 }
 $('#aiBtn').onclick = () => aiSuggest(true);
 // When the title is changed by hand, refresh the AI text (only if the user hasn't edited it)
+$('#vform').title.addEventListener('input', queueTitle);
 $('#vform').title.addEventListener('change', () => { if ($('#vform').title.value.trim() !== lastAiTitle) aiSuggest(false); });
 // ---- File box: empty state ↔ chosen file ----
 function showPicked(src, name, meta) {
@@ -339,7 +356,7 @@ async function checkDuplicate(h) {
   play(items[1] || items[0]);
   $('#dupmodal').classList.remove('hidden');
 }
-function clearFile() { const f = $('#vform'); f.vfile.value = ''; aiFrame = null; fileHash = null; dupState = 'ok'; thumbBlob = null; hashing = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
+function clearFile() { const f = $('#vform'); f.vfile.value = ''; setTimeout(checkTitle); aiFrame = null; fileHash = null; dupState = 'ok'; thumbBlob = null; hashing = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
   if (editing?.video_url) showPicked(editing.video_url, 'Current video', `${editing.resolution} · ${dur(editing.duration_seconds)}`); else showPicked(null); updateBothHint(); }
 const closeDup = () => { const dv = $('#dupvid'); dv.pause(); dv.removeAttribute('src'); $('#dupmodal').classList.add('hidden'); };
 $('#dupCancel').onclick = () => { closeDup(); clearFile(); };
@@ -383,7 +400,7 @@ async function backfillHashes() {
 const BTN = (mode, label, cls) => `<button ${mode ? `data-mode="${mode}"` : 'type="button" data-close'} class="px-4 py-2.5 rounded-lg ${cls}">${label}</button>`;
 function openVideo(v) {
   if (v && !isSuper()) return;
-  editing = v || null; thumbBlob = null; aiFrame = null; lastAi = null; lastAiTitle = null; aiSeq++; $('#aiStat').textContent = ''; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
+  editing = v || null; titleSeq++; $('#titleHint').classList.add('hidden'); thumbBlob = null; aiFrame = null; lastAi = null; lastAiTitle = null; aiSeq++; $('#aiStat').textContent = ''; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
   showPicked(null); $('#progress').classList.add('hidden'); f.category.value = '';
   const n = $('#vnote'); n.classList.toggle('hidden', isSuper()); n.textContent = 'Your video will be sent to a superadmin for review. It appears on the website only after approval.';
   $('#vbtns').innerHTML = isSuper()
@@ -420,8 +437,9 @@ $('#vform').vfile.onchange = e => {
   const file = e.target.files[0]; if (!file) return; const f = $('#vform'), vid = $('#vprev');
   if (file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
   newBlobUrl = URL.createObjectURL(file); showPicked(newBlobUrl, file.name, 'Analysing…');
-  fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); updateBothHint(); }).catch(() => { dupState = 'ok'; });
+  fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); updateBothHint(); checkTitle(); }).catch(() => { dupState = 'ok'; });
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  queueTitle();
   aiSuggest(false);                                                         // description + tags from the title
   vid.onloadedmetadata = async () => {
     f.duration_seconds.value = Math.round(vid.duration); const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h);
@@ -468,9 +486,9 @@ $('#vform').onsubmit = async e => {
     if (editing && row.status === 'approved') { row.reviewed_by = me.id; row.review_note = null; }
     const { data: saved, error } = editing ? await sb.from('videos').update(row).eq('id', editing.id).select('title').maybeSingle() : await sb.from('videos').insert(row).select('title').maybeSingle();
     if (error) throw error;
-    if (saved && saved.title !== row.title && /Variant \d+$/.test(saved.title)) toast(`Same video was uploaded before — saved as “${saved.title}”`);
+    const renamed = saved && saved.title !== row.title ? (/Variant \d+$/.test(saved.title) ? `Same video was uploaded before — saved as “${saved.title}”. ` : `Title already used — saved as “${saved.title}”. `) : '';
     if (vf) { const stale = [old.v, old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale); }
-    toast(!isSuper() ? 'Submitted — waiting for superadmin approval' : mode === 'approve' ? 'Approved — live on website' : 'Saved as draft (hidden from website)');
+    toast(renamed + (!isSuper() ? 'Submitted — waiting for superadmin approval' : mode === 'approve' ? 'Approved — live on website' : 'Saved as draft (hidden from website)'));
     $('#bar').style.width = '100%'; $('#vmodal').classList.add('hidden'); loadAll();
   } catch (err) { toast(err.message, 1); $('#ptext').textContent = err.message; }
   btns.forEach(b => b.disabled = false);
