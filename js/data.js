@@ -40,12 +40,17 @@ async function logout(){const s=await client();if(s)await s.auth.signOut();locat
 // ---- Private storage: turn stored paths into short-lived signed links ----
 const signed=new Map();  // path -> {url, exp}
 const pathOf=u=>{const m=String(u||'').match(/\/storage\/v1\/object\/(?:public|sign)\/videos\/([^?]+)/);return m?decodeURIComponent(m[1]):null};
+// B2 videos are stored as "b2:videos/…" and get links from the b2-sign server function
+const isB2=u=>typeof u==='string'&&u.startsWith('b2:');
+async function signB2(paths){const s=await client();const now=Date.now(),need=[...new Set(paths.filter(p=>isB2(p)&&!(signed.get(p)?.exp>now)))];
+  for(let i=0;i<need.length;i+=200){try{const {data}=await s.functions.invoke('b2-sign',{body:{action:'view',paths:need.slice(i,i+200)}});Object.entries(data?.urls||{}).forEach(([p,u])=>signed.set(p,{url:u,exp:now+50*60e3}))}catch(e){console.warn('b2-sign',e)}}}
 async function sign(list){const s=await client();if(!s||!list?.length)return list;const now=Date.now();
   const need=[...new Set(list.flatMap(v=>[pathOf(v.video_url),pathOf(v.thumbnail_url)]).filter(p=>p&&!(signed.get(p)?.exp>now)))];
   if(need.length){const {data}=await s.storage.from('videos').createSignedUrls(need,3600);(data||[]).forEach(d=>d.signedUrl&&signed.set(d.path,{url:d.signedUrl,exp:now+50*60e3}))}
-  return list.map(v=>{const pv=pathOf(v.video_url),pt=pathOf(v.thumbnail_url);return{...v,video_url:pv?signed.get(pv)?.url||null:v.video_url,thumbnail_url:pt?signed.get(pt)?.url||null:v.thumbnail_url,_path:pv}})}
+  await signB2(list.map(v=>v.video_url));
+  return list.map(v=>{const b=isB2(v.video_url),pv=b?null:pathOf(v.video_url),pt=pathOf(v.thumbnail_url);return{...v,video_url:b?signed.get(v.video_url)?.url||null:pv?signed.get(pv)?.url||null:v.video_url,thumbnail_url:pt?signed.get(pt)?.url||null:v.thumbnail_url,_path:pv,_b2:b?v.video_url:null}})}
 async function logDownload(id){try{const s=await client();if(s&&id)await s.rpc('log_download',{p_video:id})}catch(e){console.warn(e)}}
-async function downloadUrl(v,name){const s=await client();if(!s||!v._path)return v.video_url;const {data}=await s.storage.from('videos').createSignedUrl(v._path,600,{download:name});return data?.signedUrl}
+async function downloadUrl(v,name){const s=await client();if(s&&v._b2){const {data,error}=await s.functions.invoke('b2-sign',{body:{action:'download',id:v.id,filename:name}});return error?null:data?.url||null}if(!s||!v._path)return v.video_url;const {data}=await s.storage.from('videos').createSignedUrl(v._path,600,{download:name});return data?.signedUrl}
 const COLS='id,title,description,content,category,subcategory,video_url,thumbnail_url,duration_seconds,resolution,fps,orientation,tags,created_at';
 const words=q=>(q||'').toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu,' ').split(/\s+/).filter(w=>w.length>1).slice(0,6);
 // Relevance: title > tags > content/description

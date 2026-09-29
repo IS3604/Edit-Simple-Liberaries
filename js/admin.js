@@ -140,7 +140,7 @@ async function loadAll() {
   const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && lvl(myNew) !== role) { location.reload(); return; }
   cats = c.data || []; videos = await signVideos(v.data || []); reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
   status = topLevel ? ((await sb.rpc('team_status')).data || []) : [];
-  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderGuide(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites(); paintUsageLists();
+  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderGuide(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites(); paintUsageLists(); renderStorage();
 }
 // roles above 'admin' are all shown as superadmin
 const lvl = r => r === 'admin' ? 'admin' : r ? 'superadmin' : null;
@@ -149,8 +149,13 @@ const signCache = new Map();
 async function signVideos(list) {
   const now = Date.now(), need = [...new Set(list.flatMap(v => [storagePath(v.video_url), storagePath(v.thumbnail_url)]).filter(p => p && !(signCache.get(p)?.exp > now)))];
   for (let i = 0; i < need.length; i += 500) { const { data } = await sb.storage.from('videos').createSignedUrls(need.slice(i, i + 500), 3600); (data || []).forEach(d => d.signedUrl && signCache.set(d.path, { url: d.signedUrl, exp: now + 50 * 60e3 })); }
-  return list.map(v => ({ ...v, video_url: signCache.get(storagePath(v.video_url))?.url || v.video_url, thumbnail_url: signCache.get(storagePath(v.thumbnail_url))?.url || v.thumbnail_url }));
+  // B2 videos ("b2:videos/…") get links from the b2-sign server function
+  const b2 = [...new Set(list.map(v => v.video_url).filter(u => isB2(u) && !(signCache.get(u)?.exp > now)))];
+  for (let i = 0; i < b2.length; i += 200) { try { const { data } = await sb.functions.invoke('b2-sign', { body: { action: 'view', paths: b2.slice(i, i + 200) } }); Object.entries(data?.urls || {}).forEach(([p, u]) => signCache.set(p, { url: u, exp: now + 50 * 60e3 })); } catch (e) { console.warn('b2-sign', e); } }
+  return list.map(v => ({ ...v, _b2: isB2(v.video_url) ? v.video_url : null, video_url: (isB2(v.video_url) ? signCache.get(v.video_url)?.url : signCache.get(storagePath(v.video_url))?.url) || (isB2(v.video_url) ? null : v.video_url), thumbnail_url: signCache.get(storagePath(v.thumbnail_url))?.url || v.thumbnail_url }));
 }
+const isB2 = u => typeof u === 'string' && u.startsWith('b2:');
+const useB2 = () => (window.ES_CONFIG || {}).VIDEO_STORAGE === 'b2';
 const mains = () => cats.filter(c => !c.parent_slug);
 const subsOf = m => cats.filter(c => c.parent_slug === m);
 const cname = s => cats.find(c => c.slug === s)?.name || (s === 'both' ? 'Both (removed)' : s);
@@ -174,6 +179,33 @@ function renderDash() {
   $('#bySub').innerHTML = mains().map(m => `<div class="bg-white rounded-xl border border-outline-variant/40 p-5"><p class="font-semibold mb-3">${esc(m.name)} <span class="text-on-surface-variant font-normal">(${videos.filter(v => isLive(v) && v.category === m.slug).length})</span></p>
     ${subsOf(m.slug).map(s => { const n = videos.filter(v => isLive(v) && v.subcategory === s.slug).length; return `<div class="flex justify-between text-sm py-1"><span>${esc(s.name)}</span><span class="${n ? '' : 'text-error font-medium'}">${n}</span></div>`; }).join('')}</div>`).join('') || '<p class="text-on-surface-variant">No categories yet.</p>';
   badge(isSuper() ? 'videos' : 'requests', isSuper() ? pend : videos.filter(v => v.submitted_by === me.id && v.status === 'pending').length);
+}
+
+// ---------------- VIDEO STORAGE (owner only): move old Supabase videos to B2 ----------------
+let migrating = false, stopMigrate = false;
+function renderStorage() {
+  const box = $('#storageBox'); if (!topLevel || !useB2()) return box.classList.add('hidden');
+  const onSup = videos.filter(v => v.video_url && !v._b2 && storagePath(v.video_url)), onB2 = videos.filter(v => v._b2);
+  box.classList.remove('hidden');
+  if (migrating) return;
+  box.innerHTML = `<div class="flex flex-wrap items-center gap-3"><span class="material-symbols-outlined text-primary">cloud_sync</span><div class="flex-1 min-w-[200px]"><p class="font-semibold">Video storage</p><p class="text-sm text-on-surface-variant"><b>${onB2.length}</b> in Backblaze B2 · <b>${onSup.length}</b> still in Supabase</p></div>
+    ${onSup.length ? `<button id="migBtn" class="bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold">Move ${onSup.length} to B2</button>` : '<span class="text-sm text-green-700 font-medium">✓ All videos are in B2</span>'}</div><p id="migStat" class="text-sm mt-3 empty:hidden"></p>`;
+  const b = $('#migBtn'); if (b) b.onclick = () => migrateAll(onSup);
+}
+async function migrateAll(list) {
+  if (!confirm(`Move ${list.length} video(s) from Supabase to B2? Keep this tab open until it finishes.`)) return;
+  migrating = true; stopMigrate = false; let ok = 0, bad = 0; const errs = [];
+  $('#migBtn').outerHTML = '<button id="migStop" class="border border-outline-variant rounded-lg px-4 py-2 text-sm font-semibold">Stop</button>';
+  $('#migStop').onclick = () => { stopMigrate = true; $('#migStop').disabled = true; $('#migStop').textContent = 'Stopping…'; };
+  for (const [i, v] of list.entries()) {
+    if (stopMigrate) break;
+    $('#migStat').textContent = `Moving ${i + 1} of ${list.length}: ${v.title}…`;
+    try { const { data, error } = await sb.functions.invoke('b2-sign', { body: { action: 'migrate', id: v.id } }); if (error || data?.error) throw new Error(data?.error || await fnError(error)); ok++; }
+    catch (e) { bad++; errs.push(`${v.title}: ${e.message}`); }
+  }
+  migrating = false; await cleanStorage();
+  toast(`Moved ${ok} video(s) to B2${bad ? ` · ${bad} failed` : ''}${stopMigrate ? ' · stopped' : ''}`, bad > 0);
+  await loadAll(); if (errs.length) $('#migStat').innerHTML = '<span class="text-error">' + errs.slice(0, 5).map(esc).join('<br>') + '</span>';
 }
 
 // ---------------- USAGE (downloads) — superadmin / owner only; the server refuses everyone else ----------------
@@ -278,7 +310,7 @@ $('#vrows').onclick = async e => {
   if (d.del) {
     if (!confirm(`Delete "${v.title}"? This also removes its uploaded files.`)) return;
     const paths = [v.video_url, v.thumbnail_url].map(storagePath).filter(Boolean); if (paths.length) await sb.storage.from('videos').remove(paths);
-    const { error } = await sb.from('videos').delete().eq('id', v.id); if (error) return toast(error.message, 1); toast('Deleted'); return loadAll();
+    const { error } = await sb.from('videos').delete().eq('id', v.id); if (error) return toast(error.message, 1); toast('Deleted'); cleanStorage(); return loadAll();
   }
 };
 function preview(v) { if (!v?.video_url) return toast('No video file', 1); $('#pvid').src = v.video_url; $('#pmodal').classList.remove('hidden'); $('#pvid').play().catch(() => { }); }
@@ -440,13 +472,13 @@ let backfilling = false;
 async function cleanStorage() {
   const { data, error } = await sb.from('storage_cleanup').select('path').limit(200);
   if (error || !data?.length) return;
-  const paths = data.map(r => r.path).filter(Boolean);
-  const { error: e2 } = await sb.storage.from('videos').remove(paths); if (e2) return console.warn('cleanup', e2.message);
-  await sb.from('storage_cleanup').delete().in('path', paths);
+  const all = data.map(r => r.path).filter(Boolean), b2 = all.filter(isB2), sup = all.filter(p => !isB2(p));
+  if (sup.length) { const { error: e2 } = await sb.storage.from('videos').remove(sup); if (e2) console.warn('cleanup', e2.message); else await sb.from('storage_cleanup').delete().in('path', sup); }
+  if (b2.length) { try { await sb.functions.invoke('b2-sign', { body: { action: 'delete', paths: b2 } }); } catch (e) { console.warn('b2 cleanup', e); } }   // server removes them from the queue
 }
 async function backfillHashes() {
   if (!isSuper() || backfilling) return; backfilling = true;
-  const todo = videos.filter(v => !v.file_hash && storagePath(v.video_url)).slice(0, 25); let n = 0;
+  const todo = videos.filter(v => !v.file_hash && v.video_url && (storagePath(v.video_url) || v._b2)).slice(0, 25); let n = 0;
   for (const v of todo) { try { const h = await remoteFingerprint(v.video_url); const { error } = await sb.from('videos').update({ file_hash: h }).eq('id', v.id); if (!error) n++; } catch { } }
   backfilling = false; if (n) { toast(`Checked ${n} older video(s) for duplicates`); loadAll(); }
 }
@@ -488,7 +520,8 @@ function detectFps(vid) {
 }
 $('#vform').vfile.onchange = e => {
   const file = e.target.files[0]; if (!file) return; const f = $('#vform'), vid = $('#vprev');
-  if (file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
+  if (!useB2() && file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
+  if (useB2() && file.size > 500 * 1024 * 1024) toast('Warning: file is over 500 MB — it will be refused', 1);
   newBlobUrl = URL.createObjectURL(file); showPicked(newBlobUrl, file.name, 'Analysing…');
   fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); checkTitle(); }).catch(() => { dupState = 'ok'; });
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -509,11 +542,26 @@ $('#vform').vfile.onchange = e => {
 
 async function upload(fileOrBlob, name, label) {
   $('#ptext').textContent = 'Uploading ' + label + '…';
+  if (label === 'video' && useB2()) return uploadB2(fileOrBlob, name);
   const path = `${me.id.slice(0, 8)}/${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9.]+/g, '-')}`;
   const { error } = await sb.storage.from('videos').upload(path, fileOrBlob, { upsert: false, contentType: fileOrBlob.type || undefined, cacheControl: '31536000' });
   if (error) throw new Error(label + ': ' + error.message);
   return sb.storage.from('videos').getPublicUrl(path).data.publicUrl;
 }
+// Browser → B2 directly (the server only signs a 15-minute upload link), with a real progress bar
+async function uploadB2(file, name) {
+  const { data, error } = await sb.functions.invoke('b2-sign', { body: { action: 'upload', name, size: file.size } });
+  if (error || !data?.url) throw new Error('video: ' + (data?.error || await fnError(error) || 'could not start upload'));
+  await new Promise((ok, bad) => {
+    const x = new XMLHttpRequest(); x.open('PUT', data.url); x.setRequestHeader('Content-Type', data.contentType || file.type || 'application/octet-stream');
+    x.upload.onprogress = e => { if (e.lengthComputable) { const pc = e.loaded / e.total; $('#bar').style.width = (10 + pc * 60).toFixed(0) + '%'; $('#ptext').textContent = `Uploading video… ${Math.round(pc * 100)}%`; } };
+    x.onload = () => x.status >= 200 && x.status < 300 ? ok() : bad(new Error(`video: storage refused the upload (${x.status})`));
+    x.onerror = () => bad(new Error('video: upload failed — check your connection'));
+    x.send(file);
+  });
+  return data.path;
+}
+async function fnError(e) { try { const b = await e?.context?.json?.(); return b?.error || e?.message; } catch { return e?.message; } }
 $('#vform').onsubmit = async e => {
   e.preventDefault(); const f = e.target, mode = isSuper() ? (e.submitter?.dataset.mode || submitMode) : 'submit';
   const btns = $$('#vbtns button'); btns.forEach(b => b.disabled = true); $('#progress').classList.remove('hidden'); $('#bar').style.width = '10%';
@@ -531,14 +579,14 @@ $('#vform').onsubmit = async e => {
       tags: [...new Set(f.tags.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]
     };
     if (isSuper()) { row.status = 'approved'; row.published = mode === 'approve'; } else { row.published = true; }
-    if (vf) { row.file_hash = fileHash || await fingerprint(vf).catch(() => null); row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '70%'; if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail'); }
+    if (vf) { row.file_hash = fileHash || await fingerprint(vf).catch(() => null); row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '75%'; if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail'); }
     $('#bar').style.width = '90%'; $('#ptext').textContent = 'Saving details…';
     const old = editing ? { v: editing.video_url, t: editing.thumbnail_url } : {};
     if (editing && row.status === 'approved') { row.reviewed_by = me.id; row.review_note = null; }
     const { data: saved, error } = editing ? await sb.from('videos').update(row).eq('id', editing.id).select('title').maybeSingle() : await sb.from('videos').insert(row).select('title').maybeSingle();
     if (error) throw error;
     const renamed = saved && saved.title !== row.title ? (/Variant \d+$/.test(saved.title) ? `Same video was uploaded before — saved as “${saved.title}”. ` : `Title already used — saved as “${saved.title}”. `) : '';
-    if (vf) { const stale = [old.v, old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale); }
+    if (vf) { const stale = [old.v, old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale); if (isSuper()) cleanStorage(); }
     toast(renamed + (!isSuper() ? 'Submitted — waiting for superadmin approval' : mode === 'approve' ? 'Approved — live on website' : 'Saved as draft (hidden from website)'));
     $('#bar').style.width = '100%'; $('#vmodal').classList.add('hidden'); loadAll();
   } catch (err) { toast(err.message, 1); $('#ptext').textContent = err.message; }
@@ -577,7 +625,7 @@ function renderGuide() {
   const topR = Object.entries(reasons).sort((a, b) => b[1] - a[1]).slice(0, 4);
   $('#guide').innerHTML = `<div class="grid gap-4 lg:grid-cols-2">
   ${card('route', 'How it works', `<p>1. Click <b>Add video</b> and drop your file.</p><p>2. Pick the category and subcategory, then add a clear title and tags.</p><p>3. Click <b>Save</b> — a superadmin reviews it.</p><p>4. Track the result in <b>My requests</b>. Approved videos go live on the website.</p>`)}
-  ${card('checklist', 'Before you upload', `<p>• One clip per upload, max <b>50 MB</b>.</p><p>• Use a descriptive title (what is happening in the clip).</p><p>• Add 3–6 tags people would search for, e.g. <i>court, judge, gavel</i>.</p><p>• Horizontal clips work best on the website.</p>`)}
+  ${card('checklist', 'Before you upload', `<p>• One clip per upload, max <b>${useB2() ? 500 : 50} MB</b>.</p><p>• Use a descriptive title (what is happening in the clip).</p><p>• Add 3–6 tags people would search for, e.g. <i>court, judge, gavel</i>.</p><p>• Horizontal clips work best on the website.</p>`)}
   ${card('content_copy', 'Duplicates', `<p>If you upload a file that is already in the library you'll see a warning with a preview. Continuing saves it as “Title - Variant N”.</p>`)}
   ${card('category', 'Categories', mains().map(m => `<p><b>${esc(m.name)}</b>: ${subsOf(m.slug).map(x => esc(x.name)).join(', ') || '—'}</p>`).join(''))}
   ${card('insights', 'Your results', `<p>${mine.length} uploaded · <span class="text-green-700">${mine.filter(isLive).length} live</span> · <span class="text-amber-700">${mine.filter(v => v.status === 'pending').length} waiting</span> · <span class="text-red-700">${rej.length} rejected</span></p>${topR.length ? `<p class="pt-1">Most common rejection reasons:</p>${topR.map(([r, n]) => `<p>• ${esc(r)} <span class="text-xs">(${n}×)</span></p>`).join('')}` : ''}`)}

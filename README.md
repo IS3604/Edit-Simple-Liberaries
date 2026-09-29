@@ -34,3 +34,6 @@ Run `supabase/unique-titles.sql` once (after variants.sql). Same file → "Title
 2. CAPTCHA (Cloudflare Turnstile): create a widget at dash.cloudflare.com → Turnstile (domain: is3604.github.io).
    Put the **site key** in `js/config.js` → `TURNSTILE_SITE_KEY`. Put the **secret key** in Supabase → Authentication → Attack Protection (Bot and Abuse Protection) → enable CAPTCHA → Turnstile.
 3. Supabase → Authentication → Rate Limits: sign-ins/sign-ups ≈ 10 per 5 min per IP, token refresh default, emails ≈ 5–10 per hour, OTP/verification ≈ 10 per hour.
+
+## v6 — videos in Backblaze B2
+See `B2-SETUP.md`. Run `supabase/b2-v6.sql`, deploy the `b2-sign` edge function, add the B2 secrets, then set `VIDEO_STORAGE: "b2"` in `js/config.js`.
