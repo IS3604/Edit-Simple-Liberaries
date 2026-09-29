@@ -22,7 +22,7 @@
 <div class="stagger"><label class="text-sm font-medium">Password</label>
 <div class="relative mt-1 mb-6"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">lock</span><input name="password" type="password" autocomplete="current-password" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10 pr-10"><button type="button" id="pwEye" class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl" aria-label="Show password">visibility</button></div></div>
 <div class="stagger"><button id="loginBtn" class="relative w-full bg-primary text-on-primary rounded-xl py-3 font-semibold hover:brightness-95 active:scale-[.98] transition overflow-hidden"><span class="lbl">Log in</span><span class="spin hidden absolute inset-0 grid place-items-center"><span class="spinner"></span></span></button>
-<p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]" role="alert"></p>
+<div id="loginCap" class="flex justify-center empty:hidden mt-3"></div><p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]" role="alert"></p>
 <button type="button" id="forgotBtn" class="block mx-auto text-sm text-primary font-medium hover:underline">Forgot password?</button></div></form>
 <div id="loginOk" class="hidden login-card bg-white/90 backdrop-blur rounded-3xl p-10 shadow-2xl text-center">
 <svg class="check mx-auto" viewBox="0 0 52 52" width="72" height="72"><circle cx="26" cy="26" r="24" fill="none" stroke="#16a34a" stroke-width="3"/><path fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27l7 7 15-15"/></svg>
@@ -70,6 +70,12 @@
 
 <section id="t-requests" class="hidden"><h1 class="text-2xl font-bold mb-1">My requests</h1><p class="text-on-surface-variant mb-6">Your uploads and changes waiting for superadmin approval.</p><div id="myReq" class="space-y-3"></div></section>
 
+<section id="t-usage" class="hidden"><div class="flex flex-wrap items-center justify-between gap-3 mb-6"><div><h1 class="text-2xl font-bold">Usage</h1><p class="text-sm text-on-surface-variant">Video downloads from the website.</p></div>
+<select id="uDays" aria-label="Time range" class="rounded-lg border-outline-variant focus:ring-primary"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option></select></div>
+<div id="uStats" class="grid gap-4 grid-cols-2 lg:grid-cols-4"></div>
+<div class="bg-white rounded-xl border border-outline-variant/40 p-4 sm:p-5 mt-6"><div class="flex items-baseline justify-between mb-3"><h2 class="font-semibold">Downloads per day</h2><button id="uTableBtn" type="button" class="text-xs font-semibold text-primary">Show table</button></div><div id="uChart" class="relative"></div><div id="uTable" class="hidden mt-3 max-h-64 overflow-auto text-sm"></div></div>
+<div class="grid gap-6 lg:grid-cols-2 mt-6"><div class="bg-white rounded-xl border border-outline-variant/40 p-4 sm:p-5"><h2 class="font-semibold mb-3">Most downloaded videos</h2><div id="uTop"></div></div>
+<div class="bg-white rounded-xl border border-outline-variant/40 p-4 sm:p-5"><h2 class="font-semibold mb-3">By category</h2><div id="uCat"></div><div id="uMemberWrap" class="hidden mt-6"><h2 class="font-semibold mb-3">By member</h2><div id="uMember"></div></div></div></div></section>
 <section id="t-cats" class="hidden"><div class="flex flex-wrap items-center justify-between gap-3 mb-2"><h1 class="text-2xl font-bold">Categories</h1>
 <button id="newCat" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add category</button></div>
 <p id="catHint" class="text-sm text-on-surface-variant mb-6"></p><div id="catList" class="grid gap-4 md:grid-cols-3"></div></section>
@@ -104,7 +110,7 @@
 <div id="vchosen" class="hidden p-3"><video id="vprev" class="w-full rounded-xl max-h-64 bg-black" controls muted playsinline></video>
 <div class="flex items-center gap-2 mt-2 text-sm"><span class="material-symbols-outlined text-primary !text-lg">movie</span><span id="vname" class="flex-1 truncate font-medium"></span><span id="vmeta" class="text-xs text-on-surface-variant"></span><button type="button" id="vchange" class="text-primary font-semibold text-sm">Change</button></div></div></div>
 <div><label class="text-sm font-medium">Category *</label><select name="category" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></select></div>
-<div><label class="text-sm font-medium">Subcategory *</label><select name="subcategory" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></select></div><p id="bothHint" class="hidden sm:col-span-2 -mt-2 text-xs rounded-lg px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200"></p>
+<div><label class="text-sm font-medium">Subcategory *</label><select name="subcategory" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></select></div>
 <div class="sm:col-span-2"><label class="text-sm font-medium">Title *</label><input name="title" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><p id="titleHint" class="hidden mt-1 text-xs"></p></div>
 <div class="sm:col-span-2"><div class="flex items-center gap-2"><label class="text-sm font-medium flex-1">Short description</label><span id="aiStat" class="text-xs text-on-surface-variant"></span><button type="button" id="aiBtn" class="text-xs font-semibold text-primary hover:bg-primary-fixed/50 rounded-md px-2 py-1 flex items-center gap-1"><span class="material-symbols-outlined !text-base">auto_awesome</span>Suggest with AI</button></div><textarea name="description" rows="2" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></textarea></div>
 <div class="sm:col-span-2"><label class="text-sm font-medium">Tags / keywords (comma separated)</label><input name="tags" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary" placeholder="court, judge, gavel"></div>
@@ -150,5 +156,5 @@
 <!-- PREVIEW MODAL -->
 <div id="pmodal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div class="w-full max-w-3xl"><div class="flex justify-end mb-2"><button data-close class="material-symbols-outlined text-white" aria-label="Close">close</button></div><video id="pvid" controls class="w-full rounded-xl bg-black max-h-[80vh]"></video></div></div>
 
-<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/admin.js" type="module"></script>
+<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/captcha.js"></script><script src="js/admin.js" type="module"></script>
 </body></html>

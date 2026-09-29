@@ -4,8 +4,6 @@ let CATS = [
     subs:[['courtroom','Courtroom'],['consultation','Client Consultation'],['documents','Contracts & Documents'],['law-office','Law Office'],['justice','Justice & Symbols']] },
   { slug:'doctors', name:'For Doctors', icon:'stethoscope', blurb:'Clinic, hospital and patient-care footage for doctors and healthcare brands.',
     subs:[['hospital','Hospital & Clinic'],['surgery','Surgery & Procedures'],['patient-care','Patient Care'],['med-tech','Medical Technology'],['lab','Pharmacy & Lab']] },
-  { slug:'both', name:'For Both', icon:'handshake', blurb:'Professional b-roll that works for legal and medical practices alike.',
-    subs:[['meetings','Office & Meetings'],['testimonials','Testimonials & Interviews'],['backgrounds','Explainer Backgrounds'],['trust','Trust & Professionalism'],['social','Social Media Reels']] }
 ];
 const SAMPLE = (() => {
   const t = {courtroom:['Judge Gavel Close-Up','Empty Courtroom Pan'],consultation:['Lawyer Meets Client','Signing With Attorney'],documents:['Contract Signing Macro','Flipping Legal Files'],'law-office':['Law Library Shelves','Attorney at Desk'],justice:['Scales of Justice Rotate','Lady Justice Statue'],
@@ -35,7 +33,7 @@ async function gate(){
   return waitLogin();
 }
 function waitLogin(msg){ const show=()=>window.esShowLogin?.(msg); document.readyState==='loading'?document.addEventListener('DOMContentLoaded',show):setTimeout(show); return new Promise(()=>{}); }
-async function login(email,password){if(esLock.left()>0)return `Too many attempts. Try again in ${esLock.left()}s.`;const s=await client();const {error}=await s.auth.signInWithPassword({email,password});if(error)return esLock.fail(error.message);
+async function login(email,password,captchaToken){if(esLock.left()>0)return `Too many attempts. Try again in ${esLock.left()}s.`;const s=await client();const {error}=await s.auth.signInWithPassword({email,password,options:{captchaToken}});if(error)return esLock.fail(esCaptcha.friendly(error.message));
   const {data:r}=await s.rpc('my_role');if(!r){await s.auth.signOut();return 'This account has no access. Ask a superadmin to add you.'}esLock.reset();return null}
 async function resetPassword(email){const s=await client();return s.auth.resetPasswordForEmail(email,{redirectTo:new URL('admin.html',location.href).href})}
 async function logout(){const s=await client();if(s)await s.auth.signOut();location.reload()}
@@ -46,6 +44,7 @@ async function sign(list){const s=await client();if(!s||!list?.length)return lis
   const need=[...new Set(list.flatMap(v=>[pathOf(v.video_url),pathOf(v.thumbnail_url)]).filter(p=>p&&!(signed.get(p)?.exp>now)))];
   if(need.length){const {data}=await s.storage.from('videos').createSignedUrls(need,3600);(data||[]).forEach(d=>d.signedUrl&&signed.set(d.path,{url:d.signedUrl,exp:now+50*60e3}))}
   return list.map(v=>{const pv=pathOf(v.video_url),pt=pathOf(v.thumbnail_url);return{...v,video_url:pv?signed.get(pv)?.url||null:v.video_url,thumbnail_url:pt?signed.get(pt)?.url||null:v.thumbnail_url,_path:pv}})}
+async function logDownload(id){try{const s=await client();if(s&&id)await s.rpc('log_download',{p_video:id})}catch(e){console.warn(e)}}
 async function downloadUrl(v,name){const s=await client();if(!s||!v._path)return v.video_url;const {data}=await s.storage.from('videos').createSignedUrl(v._path,600,{download:name});return data?.signedUrl}
 const COLS='id,title,description,content,category,subcategory,video_url,thumbnail_url,duration_seconds,resolution,fps,orientation,tags,created_at';
 const words=q=>(q||'').toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu,' ').split(/\s+/).filter(w=>w.length>1).slice(0,6);
@@ -84,7 +83,7 @@ const bump=()=>{clearTimeout(lt);lt=setTimeout(fire,500)};
 async function onChange(cb){subs.push(cb);if(subs.length>1)return;await ready;
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)bump()});setInterval(()=>{if(!document.hidden)bump()},60000);
   const s=await client();if(!s)return;ch=s.channel('site-live');['videos','categories'].forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},bump));ch.subscribe();}
-window.ES={CATS,client,onChange,ready,login,logout,resetPassword,downloadUrl,listVideos,getVideo,counts,
+window.ES={CATS,client,onChange,ready,login,logout,resetPassword,downloadUrl,logDownload,listVideos,getVideo,counts,
   get user(){return USER},get role(){return ROLE},
   cat:slug=>CATS.find(c=>c.slug===slug),
   subName:(c,s)=>(CATS.find(x=>x.slug===c)?.subs.find(x=>x[0]===s)||[,s])[1],

@@ -83,7 +83,7 @@ drop policy if exists "Public read videos bucket" on storage.objects;
 drop policy if exists "Admins read videos bucket" on storage.objects;
 create policy "Admins read videos bucket" on storage.objects for select using (bucket_id = 'videos' and public.is_admin());
 
--- 5) "For Both" only when the same video already exists in For Lawyers AND For Doctors
+-- 5) "For Both" only when the same video already exists in Lawyers AND Doctors
 create or replace function public.videos_both_rule() returns trigger
 language plpgsql security definer set search_path = public
 as $$

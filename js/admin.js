@@ -35,9 +35,11 @@ $('#setpwForm').onsubmit = async e => {
   toast('Password saved'); show('boot'); boot(true);
 };
 const forgotTick = esReset.bind($('#forgotBtn'));
+const loginCap = esCaptcha.mount($('#loginCap'));
 $('#forgotBtn').onclick = async () => {
   const err = $('#loginErr'); err.textContent = ''; err.classList.replace('text-green-700', 'text-error');
-  const r = await esReset.send(e => sb.auth.resetPasswordForEmail(e, { redirectTo: ADMIN_URL }), $('#loginForm').email.value);
+  let r; try { r = await esReset.send(async e => { const captchaToken = await loginCap.token(); const out = await sb.auth.resetPasswordForEmail(e, { redirectTo: ADMIN_URL, captchaToken }); if (out.error) out.error.message = esCaptcha.friendly(out.error.message); return out; }, $('#loginForm').email.value); }
+  catch (x) { r = { ok: false, msg: x.message }; } finally { loginCap.reset(); }
   err.textContent = r.msg; if (r.ok) err.classList.replace('text-error', 'text-green-700'); forgotTick();
 };
 // Handles links from Supabase emails (invite, signup, magic link, reset, email change)
@@ -68,7 +70,7 @@ async function boot(skipLink) {
   $('#meRole').textContent = myTitle || role; $('#meRole').className += isSuper() ? ' bg-primary text-on-primary' : ' bg-surface-container text-on-surface-variant';
   buildTabs(); show('app');
   paintSkeletons(); tab(location.hash.slice(1));
-  await loadAll(); live(); setTimeout(backfillHashes, 1500);
+  await loadAll(); live(); setTimeout(backfillHashes, 1500); if (isSuper()) setTimeout(cleanStorage, 2500);
 }
 // ---------------- LIVE UPDATES ----------------
 let liveCh = null, liveT = null;
@@ -89,11 +91,12 @@ $('#loginForm').onsubmit = async e => {
   b.disabled = true; b.querySelector('.lbl').classList.add('invisible'); b.querySelector('.spin').classList.remove('hidden');
   let msg = null;
   try {
-    const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
-    if (error) msg = esLock.fail(error.message);
+    const captchaToken = await loginCap.token();
+    const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value, options: { captchaToken } });
+    if (error) msg = esLock.fail(esCaptcha.friendly(error.message));
     else { const { data: r } = await sb.rpc('my_role'); if (!r) { await sb.auth.signOut(); msg = 'This account has no admin access. Ask a superadmin to add you.'; } else esLock.reset(); }
-  } catch { msg = 'Could not reach the server. Check your connection and try again.'; }
-  b.disabled = false; b.querySelector('.lbl').classList.remove('invisible'); b.querySelector('.spin').classList.add('hidden');
+  } catch (x) { msg = /security check/i.test(x?.message || '') ? x.message : 'Could not reach the server. Check your connection and try again.'; }
+  loginCap.reset(); b.disabled = false; b.querySelector('.lbl').classList.remove('invisible'); b.querySelector('.spin').classList.add('hidden');
   if (msg) return fail(msg);
   card.classList.add('hidden'); $('#loginOk').classList.remove('hidden');
   setTimeout(() => { show('boot'); boot(true).then(() => { card.classList.remove('hidden'); $('#loginOk').classList.add('hidden'); f.reset(); }); }, 1100);
@@ -105,7 +108,7 @@ $('#logout').onclick = logout; $('#logoutM').onclick = logout;
 // ---------------- TABS ----------------
 function buildTabs() {
   const t = isSuper()
-    ? [['dash', 'dashboard', 'Dashboard'], ['videos', 'movie', 'Videos'], ['cats', 'category', 'Categories'], ['team', 'group', 'Team']]
+    ? [['dash', 'dashboard', 'Dashboard'], ['videos', 'movie', 'Videos'], ['usage', 'monitoring', 'Usage'], ['cats', 'category', 'Categories'], ['team', 'group', 'Team']]
     : [['videos', 'movie', 'Videos'], ['requests', 'pending_actions', 'My requests'], ['guide', 'menu_book', 'Upload guide']];
   $('#tabs').innerHTML = t.map(([k, i, l]) => `<button data-tab="${k}" class="tab flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"><span class="material-symbols-outlined">${i}</span><span class="hidden sm:inline">${l}</span><span data-badge="${k}" class="hidden ml-auto text-[11px] font-bold bg-error text-white rounded-full px-1.5 min-w-[20px] text-center"></span></button>`).join('');
   $$('.tab').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -115,6 +118,7 @@ function tab(t) {
   if (!$('#t-' + t) || !$(`.tab[data-tab="${t}"]`)) t = $('.tab')?.dataset.tab || 'videos'; history.replaceState(null, '', '#' + t);
   if (t === 'videos' && filter !== undefined) { $('#vstat').value = filter; renderVideos(); }
   $$('main > section').forEach(s => s.classList.toggle('hidden', s.id !== 't-' + t));
+  if (t === 'usage') loadUsage();
   $$('.tab').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('bg-primary', on); b.classList.toggle('text-on-primary', on); b.classList.toggle('hover:bg-surface-container', !on); });
 }
 function badge(k, n) { const b = $(`[data-badge="${k}"]`); if (!b) return; b.textContent = n; b.classList.toggle('hidden', !n); }
@@ -136,7 +140,7 @@ async function loadAll() {
   const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && lvl(myNew) !== role) { location.reload(); return; }
   cats = c.data || []; videos = await signVideos(v.data || []); reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
   status = topLevel ? ((await sb.rpc('team_status')).data || []) : [];
-  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderGuide(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites();
+  renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderGuide(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites(); paintUsageLists();
 }
 // roles above 'admin' are all shown as superadmin
 const lvl = r => r === 'admin' ? 'admin' : r ? 'superadmin' : null;
@@ -149,7 +153,7 @@ async function signVideos(list) {
 }
 const mains = () => cats.filter(c => !c.parent_slug);
 const subsOf = m => cats.filter(c => c.parent_slug === m);
-const cname = s => cats.find(c => c.slug === s)?.name || s;
+const cname = s => cats.find(c => c.slug === s)?.name || (s === 'both' ? 'Both (removed)' : s);
 const who = id => team.find(t => t.user_id === id)?.email || (id === me.id ? me.email : 'Superadmin');
 const isLive = v => v.status === 'approved' && v.published;
 const pendReqFor = (entity, target) => reqs.find(r => r.status === 'pending' && r.entity === entity && r.target === target);
@@ -171,6 +175,53 @@ function renderDash() {
     ${subsOf(m.slug).map(s => { const n = videos.filter(v => isLive(v) && v.subcategory === s.slug).length; return `<div class="flex justify-between text-sm py-1"><span>${esc(s.name)}</span><span class="${n ? '' : 'text-error font-medium'}">${n}</span></div>`; }).join('')}</div>`).join('') || '<p class="text-on-surface-variant">No categories yet.</p>';
   badge(isSuper() ? 'videos' : 'requests', isSuper() ? pend : videos.filter(v => v.submitted_by === me.id && v.status === 'pending').length);
 }
+
+// ---------------- USAGE (downloads) — superadmin / owner only; the server refuses everyone else ----------------
+let usageSeq = 0;
+const fmtDay = (d, long) => new Date(d + 'T00:00:00').toLocaleDateString(undefined, long ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' });
+function barList(rows, label) { const max = Math.max(1, ...rows.map(r => r.n));
+  return rows.length ? rows.map(r => `<div class="py-1.5"><div class="flex justify-between gap-3 text-sm"><span class="truncate">${label(r)}</span><span class="font-semibold tabular-nums">${r.n}</span></div><div class="h-1.5 mt-1 rounded-full bg-surface-container overflow-hidden"><div class="h-full rounded-full bg-[#e0701f]" style="width:${(r.n / max * 100).toFixed(1)}%"></div></div></div>`).join('')
+    : '<p class="text-sm text-on-surface-variant py-6 text-center">No downloads in this period.</p>'; }
+function usageChart(daily) {
+  const W = 720, H = 220, L = 34, B = 26, T = 10, n = daily.length, max = Math.max(1, ...daily.map(d => d.n));
+  const step = Math.pow(10, Math.floor(Math.log10(max))); const top = Math.ceil(max / step) * step || 1;
+  const bw = (W - L) / n, gap = Math.min(2, bw * .25), y = v => T + (H - T - B) * (1 - v / top);
+  const ticks = [0, top / 2, top].filter((v, i, a) => a.indexOf(v) === i && Number.isInteger(v));
+  const every = Math.ceil(n / 8);
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="Downloads per day, ${n} days, max ${max}">
+  ${ticks.map(v => `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#eadfd5" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#6b5a4d">${v}</text>`).join('')}
+  ${daily.map((d, i) => { const w = Math.max(1, Math.min(bw - gap, 36)), x = L + i * bw + (bw - w) / 2, h = Math.max(0, y(0) - y(d.n));
+    return `<g class="ubar" data-i="${i}"><rect x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}" fill="transparent"/>${d.n ? (() => { const r = Math.min(4, w / 2, h); return `<path d="M${x},${y(0)} v${-(h - r)} q0,${-r} ${r},${-r} h${w - 2 * r} q${r},0 ${r},${r} v${h - r} z" fill="#e0701f"/>`; })() : ''}</g>`; }).join('')}
+  <line x1="${L}" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="#cdbfb2"/>
+  ${daily.map((d, i) => i % every === 0 || i === n - 1 ? `<text x="${L + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#6b5a4d">${fmtDay(d.day)}</text>` : '').join('')}
+</svg><div id="uTip" class="hidden absolute pointer-events-none bg-neutral-900 text-white text-xs rounded-md px-2.5 py-1.5 shadow-lg whitespace-nowrap"></div>`;
+}
+async function loadUsage() {
+  if (!isSuper()) return; const my = ++usageSeq, days = +$('#uDays').value;
+  $('#uStats').innerHTML = skCards(4); $('#uChart').innerHTML = '<div class="sk h-48"></div>'; $('#uTop').innerHTML = skCards(3, 12); $('#uCat').innerHTML = skCards(3, 12);
+  const { data: d, error } = await sb.rpc('download_stats', { p_days: days });
+  if (my !== usageSeq) return;
+  if (error || !d) { $('#uStats').innerHTML = ''; $('#uChart').innerHTML = `<p class="text-sm text-error py-8 text-center">Could not load usage: ${esc(error?.message || 'no data')}${/download_stats|function/.test(error?.message || '') ? ' — run downloads-v4.sql' : ''}</p>`; $('#uTop').innerHTML = $('#uCat').innerHTML = ''; return; }
+  const tile = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-5"><span class="material-symbols-outlined text-primary">${i}</span><p class="text-3xl font-bold mt-2 tabular-nums">${n}</p><p class="text-sm text-on-surface-variant">${l}</p></div>`;
+  $('#uStats').innerHTML = tile('download', d.in_range, `Downloads · last ${d.days} days`) + tile('today', d.today, 'Today') + tile('movie', d.videos, 'Different videos downloaded') + tile('all_inclusive', d.total, 'All-time downloads');
+  $('#uChart').innerHTML = usageChart(d.daily);
+  const tip = $('#uTip'), box = $('#uChart');
+  $$('#uChart .ubar').forEach(g => { g.onmouseenter = g.onclick = () => { const x = d.daily[+g.dataset.i], r = g.getBoundingClientRect(), b = box.getBoundingClientRect();
+      tip.innerHTML = `<b>${x.n}</b> download${x.n === 1 ? '' : 's'} · ${fmtDay(x.day, 1)}`; tip.classList.remove('hidden');
+      tip.style.left = Math.min(Math.max(0, r.left - b.left + r.width / 2 - tip.offsetWidth / 2), b.width - tip.offsetWidth) + 'px'; tip.style.top = '-6px'; g.querySelector('path')?.setAttribute('fill', '#b8551a'); };
+    g.onmouseleave = () => { tip.classList.add('hidden'); g.querySelector('path')?.setAttribute('fill', '#e0701f'); }; });
+  $('#uTable').innerHTML = `<table class="w-full"><thead><tr class="text-left text-on-surface-variant"><th class="py-1">Day</th><th class="py-1 text-right">Downloads</th></tr></thead><tbody>${[...d.daily].reverse().map(x => `<tr class="border-t border-outline-variant/30"><td class="py-1">${fmtDay(x.day, 1)}</td><td class="py-1 text-right tabular-nums">${x.n}</td></tr>`).join('')}</tbody></table>`;
+  lastUsage = d; paintUsageLists();
+}
+let lastUsage = null;
+function paintUsageLists() { const d = lastUsage; if (!d) return;       // category names need `cats`, so this re-runs after loadAll too
+  $('#uTop').innerHTML = barList(d.top, r => `${esc(r.title || 'Deleted video')} <span class="text-xs text-on-surface-variant">· ${esc(cname(r.category))}</span>`);
+  $('#uCat').innerHTML = barList(d.by_category, r => esc(cname(r.category)));
+  $('#uMemberWrap').classList.toggle('hidden', !Array.isArray(d.by_member));
+  if (Array.isArray(d.by_member)) $('#uMember').innerHTML = barList(d.by_member, r => esc(r.email));
+}
+$('#uDays').onchange = loadUsage;
+$('#uTableBtn').onclick = () => { const t = $('#uTable'); t.classList.toggle('hidden'); $('#uTableBtn').textContent = t.classList.contains('hidden') ? 'Show table' : 'Hide table'; };
 
 // ---------------- VIDEOS ----------------
 function statusChip(v) {
@@ -271,7 +322,7 @@ function fillCatSelects() {
 }
 function fillSubs(sel) { const f = $('#vform'), c = f.category.value; f.subcategory.disabled = !c;
   f.subcategory.innerHTML = `<option value="">${c ? 'Select subcategory' : 'Select category first'}</option>` + subsOf(c).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); f.subcategory.value = sel || ''; }
-$('#vform').category.onchange = () => { fillSubs(); updateBothHint(); };
+$('#vform').category.onchange = () => { fillSubs(); };
 
 let aiFrame = null, aiSeq = 0, lastAi = null, lastAiTitle = null, editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null, newBlobUrl = null;
 // Turn a failed function call into a readable reason
@@ -357,22 +408,16 @@ async function checkDuplicate(h) {
   $('#dupmodal').classList.remove('hidden');
 }
 function clearFile() { const f = $('#vform'); f.vfile.value = ''; setTimeout(checkTitle); aiFrame = null; fileHash = null; dupState = 'ok'; thumbBlob = null; hashing = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
-  if (editing?.video_url) showPicked(editing.video_url, 'Current video', `${editing.resolution} · ${dur(editing.duration_seconds)}`); else showPicked(null); updateBothHint(); }
+  if (editing?.video_url) showPicked(editing.video_url, 'Current video', `${editing.resolution} · ${dur(editing.duration_seconds)}`); else showPicked(null);}
 const closeDup = () => { const dv = $('#dupvid'); dv.pause(); dv.removeAttribute('src'); $('#dupmodal').classList.add('hidden'); };
 $('#dupCancel').onclick = () => { closeDup(); clearFile(); };
-$('#dupGo').onclick = () => { closeDup(); dupState = 'ok'; toast('OK — it will be saved as a new variant'); updateBothHint(); };
+$('#dupGo').onclick = () => { closeDup(); dupState = 'ok'; toast('OK — it will be saved as a new variant');};
 // Drag & drop onto the file box
 (() => { const z = $('#vdrop'), inp = $('#vform').vfile, on = x => { z.classList.toggle('border-primary', x); z.classList.toggle('bg-primary-fixed/40', x); };
   ['dragenter', 'dragover'].forEach(ev => z.addEventListener(ev, e => { e.preventDefault(); on(true); }));
   ['dragleave', 'drop'].forEach(ev => z.addEventListener(ev, e => { e.preventDefault(); on(false); }));
   z.addEventListener('drop', e => { const file = [...(e.dataTransfer?.files || [])].find(x => x.type.startsWith('video/')); if (!file) return toast('Please drop a video file', 1);
     const dt = new DataTransfer(); dt.items.add(file); inp.files = dt.files; inp.dispatchEvent(new Event('change')); }); })();
-// ---- "For Both" rule: the same video must already be in For Lawyers AND For Doctors ----
-function bothAllowed(h, exceptId) { if (!h) return false; const ok = c => videos.some(v => v.file_hash === h && v.category === c && v.status !== 'rejected' && v.id !== exceptId); return ok('lawyers') && ok('doctors'); }
-function updateBothHint() { const f = $('#vform'), el = $('#bothHint'); if (f.category.value !== 'both') return el.classList.add('hidden');
-  const h = fileHash || (!f.vfile.files[0] && editing?.file_hash);
-  el.className = 'sm:col-span-2 -mt-2 text-xs rounded-lg px-3 py-2 border ' + (h && bothAllowed(h, editing?.id) ? 'bg-green-50 text-green-800 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200');
-  el.textContent = h && bothAllowed(h, editing?.id) ? '✓ This video is already in For Lawyers and For Doctors — it can be added to For Both.' : 'For Both is only allowed when this same video is already in For Lawyers and For Doctors.'; }
 // Fingerprint of the file (size + SHA-256 of first/last 4 MB) to detect re-uploads of the same video
 async function fingerprint(file) {
   const MB = 4 * 1024 * 1024, parts = file.size <= 2 * MB ? [file] : [file.slice(0, MB), file.slice(file.size - MB)];
@@ -391,6 +436,14 @@ async function remoteFingerprint(url) {
 }
 // Superadmin: fingerprint older videos (uploaded before duplicate detection) in the background
 let backfilling = false;
+// Files left behind by removed videos (e.g. the old "Both" category) — deleted once by a superadmin session
+async function cleanStorage() {
+  const { data, error } = await sb.from('storage_cleanup').select('path').limit(200);
+  if (error || !data?.length) return;
+  const paths = data.map(r => r.path).filter(Boolean);
+  const { error: e2 } = await sb.storage.from('videos').remove(paths); if (e2) return console.warn('cleanup', e2.message);
+  await sb.from('storage_cleanup').delete().in('path', paths);
+}
 async function backfillHashes() {
   if (!isSuper() || backfilling) return; backfilling = true;
   const todo = videos.filter(v => !v.file_hash && storagePath(v.video_url)).slice(0, 25); let n = 0;
@@ -413,7 +466,7 @@ function openVideo(v) {
     f.category.value = v.category; f.tags.value = (v.tags || []).join(', ');
     if (v.video_url) showPicked(v.video_url, 'Current video', `${v.resolution} · ${dur(v.duration_seconds)}`);
   }
-  fillSubs(v?.subcategory); updateBothHint(); $('#vmodal').classList.remove('hidden'); f.title.focus();
+  fillSubs(v?.subcategory); $('#vmodal').classList.remove('hidden'); f.title.focus();
 }
 $('#newVideo').onclick = () => openVideo();
 $$('#vmodal [data-close], #cmodal [data-close]').forEach(b => b.onclick = () => b.closest('.fixed').classList.add('hidden'));
@@ -437,7 +490,7 @@ $('#vform').vfile.onchange = e => {
   const file = e.target.files[0]; if (!file) return; const f = $('#vform'), vid = $('#vprev');
   if (file.size > 50 * 1024 * 1024) toast('Warning: file is over 50 MB — Supabase free plan may reject it', 1);
   newBlobUrl = URL.createObjectURL(file); showPicked(newBlobUrl, file.name, 'Analysing…');
-  fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); updateBothHint(); checkTitle(); }).catch(() => { dupState = 'ok'; });
+  fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); checkTitle(); }).catch(() => { dupState = 'ok'; });
   if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   queueTitle();
   aiSuggest(false);                                                         // description + tags from the title
@@ -471,8 +524,6 @@ $('#vform').onsubmit = async e => {
     if (!f.subcategory.value) throw new Error('Please select a subcategory');
     if (vf && hashing) { $('#ptext').textContent = 'Checking for duplicates…'; await hashing; }
     if (vf && dupState === 'ask') { $('#dupmodal').classList.remove('hidden'); throw new Error('Confirm the duplicate warning first'); }
-    const bothH = vf ? fileHash : editing?.file_hash, catChanged = !editing || vf || editing.category !== f.category.value;
-    if (f.category.value === 'both' && catChanged && !bothAllowed(bothH, editing?.id)) throw new Error('For Both is only allowed when this same video is already in For Lawyers and For Doctors.');
     if (vf && !f.duration_seconds.value) throw new Error('Still analysing the video — try again in a second');
     const row = {
       title: f.title.value.trim(), description: f.description.value.trim(), category: f.category.value, subcategory: f.subcategory.value,
@@ -527,7 +578,6 @@ function renderGuide() {
   $('#guide').innerHTML = `<div class="grid gap-4 lg:grid-cols-2">
   ${card('route', 'How it works', `<p>1. Click <b>Add video</b> and drop your file.</p><p>2. Pick the category and subcategory, then add a clear title and tags.</p><p>3. Click <b>Save</b> — a superadmin reviews it.</p><p>4. Track the result in <b>My requests</b>. Approved videos go live on the website.</p>`)}
   ${card('checklist', 'Before you upload', `<p>• One clip per upload, max <b>50 MB</b>.</p><p>• Use a descriptive title (what is happening in the clip).</p><p>• Add 3–6 tags people would search for, e.g. <i>court, judge, gavel</i>.</p><p>• Horizontal clips work best on the website.</p>`)}
-  ${card('handshake', '“For Both” rule', `<p>A video can be added to <b>For Both</b> only when the same video is already in <b>For Lawyers</b> and <b>For Doctors</b>.</p>`)}
   ${card('content_copy', 'Duplicates', `<p>If you upload a file that is already in the library you'll see a warning with a preview. Continuing saves it as “Title - Variant N”.</p>`)}
   ${card('category', 'Categories', mains().map(m => `<p><b>${esc(m.name)}</b>: ${subsOf(m.slug).map(x => esc(x.name)).join(', ') || '—'}</p>`).join(''))}
   ${card('insights', 'Your results', `<p>${mine.length} uploaded · <span class="text-green-700">${mine.filter(isLive).length} live</span> · <span class="text-amber-700">${mine.filter(v => v.status === 'pending').length} waiting</span> · <span class="text-red-700">${rej.length} rejected</span></p>${topR.length ? `<p class="pt-1">Most common rejection reasons:</p>${topR.map(([r, n]) => `<p>• ${esc(r)} <span class="text-xs">(${n}×)</span></p>`).join('')}` : ''}`)}

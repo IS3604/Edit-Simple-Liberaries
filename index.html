@@ -21,26 +21,26 @@
 </div></section>
 <section class="max-w-7xl mx-auto px-4 md:px-6 mt-10 sm:mt-14">
 <div class="flex items-end justify-between gap-4 mb-6 sm:mb-8"><div><h2 class="text-2xl md:text-3xl font-bold">Browse by practice</h2><p class="text-on-surface-variant mt-1">Pick your field, then jump straight to the scene you need.</p></div></div>
-<div id="cats" class="grid gap-5 md:gap-6 md:grid-cols-3"></div></section>
+<div id="cats" class="grid gap-5 md:gap-6 md:grid-cols-2"></div></section>
 <section class="max-w-7xl mx-auto px-4 md:px-6 mt-14 sm:mt-20">
 <div class="flex items-end justify-between gap-4 mb-6"><div><h2 class="text-2xl md:text-3xl font-bold">Latest Videos</h2><p class="text-on-surface-variant">Freshly added to the library.</p></div><a href="videos.html" class="text-primary font-semibold text-sm flex items-center shrink-0">View all<span class="material-symbols-outlined">chevron_right</span></a></div>
 <div id="latest" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div></section>
 </main>
-<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
+<script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/captcha.js"></script><script src="js/data.js"></script><script src="js/layout.js"></script>
 <script>
 (()=>{
 const f=document.getElementById('hero-search'),cats=document.getElementById('cats'),latest=document.getElementById('latest');
 latest.innerHTML=esSkel(6);
 const catSkel=`<div class="rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40"><div class="sk aspect-[16/10] !rounded-none"></div><div class="p-5"><div class="sk h-3 w-full mb-1"></div><div class="sk h-3 w-2/3 mb-4"></div><div class="flex gap-2"><div class="sk h-7 w-20"></div><div class="sk h-7 w-24"></div><div class="sk h-7 w-16"></div></div></div></div>`;
-const G={lawyers:'from-orange-400 via-amber-500 to-orange-700',doctors:'from-rose-300 via-orange-400 to-amber-600',both:'from-amber-300 via-orange-400 to-rose-500'};
+const G={lawyers:'from-orange-400 via-amber-500 to-orange-700',doctors:'from-rose-300 via-orange-400 to-amber-600'};
 // Random topic photos from the internet (loremflickr, keyword search). Falls back to gradient + icon if offline.
-const KW={lawyers:['lawyer,law','courtroom,judge','gavel,justice','contract,signing','law,library'],doctors:['doctor,hospital','surgery,surgeon','nurse,patient','stethoscope,medical','laboratory,science'],both:['office,meeting','business,handshake','interview,camera','teamwork,office','professional,portrait']};
+const KW={lawyers:['lawyer,law','courtroom,judge','gavel,justice','contract,signing','law,library'],doctors:['doctor,hospital','surgery,surgeon','nurse,patient','stethoscope,medical','laboratory,science']};
 const kws=c=>{const k=KW[c.slug]||[c.name.replace(/^For /,''),...c.subs.map(s=>s[1])].map(x=>String(x).toLowerCase().replace(/[^a-z ]/g,'').trim().split(/\s+/).slice(0,2).join(','));return [...k].sort(()=>Math.random()-.5)};
 const pic=(k,w,h,cl)=>`<img src="https://loremflickr.com/${w}/${h}/${encodeURIComponent(k).replace(/%2C/g,',')}?lock=${1+Math.floor(Math.random()*9999)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.style.opacity=1" onerror="this.remove()" style="opacity:0;transition:opacity .6s" class="${cl} w-full h-full object-cover">`;
 const mosaic=c=>{const k=kws(c);
  return `<span class="material-symbols-outlined absolute right-5 top-4 text-white/25 !text-[120px] leading-none" aria-hidden="true">${c.icon}</span><div class="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-0.5">${pic(k[0],640,400,'col-span-2 row-span-2')}${pic(k[1]||k[0],320,200,'')}${pic(k[2]||k[0],320,200,'')}</div>`};
 const card=(c,n)=>`<article class="cat-card group flex flex-col rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-primary/40 transition-all duration-300">
- <a href="videos.html?cat=${c.slug}" class="cat-media relative block aspect-[16/10] bg-gradient-to-br ${G[c.slug]||G.both} overflow-hidden" aria-label="Browse ${esEsc(c.name)}">${mosaic(c)}
+ <a href="videos.html?cat=${c.slug}" class="cat-media relative block aspect-[16/10] bg-gradient-to-br ${G[c.slug]||G.lawyers} overflow-hidden" aria-label="Browse ${esEsc(c.name)}">${mosaic(c)}
   <span class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent"></span>
   <span class="absolute top-3 right-3 text-[11px] font-bold bg-white/95 text-on-surface px-2.5 py-1 rounded-full shadow">${n} video${n===1?'':'s'}</span>
   <span class="absolute left-4 right-4 bottom-4 flex items-center gap-3 text-white"><span class="w-11 h-11 shrink-0 rounded-2xl bg-white/20 backdrop-blur grid place-items-center ring-1 ring-white/40"><span class="material-symbols-outlined">${c.icon}</span></span><span class="text-xl sm:text-2xl font-bold font-display leading-tight drop-shadow">${esEsc(c.name)}</span></span></a>
@@ -48,7 +48,7 @@ const card=(c,n)=>`<article class="cat-card group flex flex-col rounded-3xl over
   <p class="text-sm text-on-surface-variant">${esEsc(c.blurb)}</p>
   <div class="flex gap-2 mt-4 -mx-5 px-5 overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">${c.subs.map(([s,nm])=>`<a href="videos.html?cat=${c.slug}&sub=${s}" class="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-surface-container hover:bg-primary hover:text-on-primary transition">${esEsc(nm)}</a>`).join('')}</div>
   <a href="videos.html?cat=${c.slug}" class="mt-auto pt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary">Explore ${esEsc(c.name.replace(/^For /,'').toLowerCase())} footage<span class="material-symbols-outlined !text-lg group-hover:translate-x-1 transition-transform">arrow_forward</span></a></div></article>`;
-cats.innerHTML=catSkel.repeat(3);
+cats.innerHTML=catSkel.repeat(2);
 f.onsubmit=e=>{e.preventDefault();const p=new URLSearchParams();if(f.cat.value)p.set('cat',f.cat.value);if(f.q.value.trim())p.set('q',f.q.value.trim());location.href='videos.html?'+p};
 const render=async()=>{
  f.cat.innerHTML='<option value="">All categories</option>'+ES.CATS.map(c=>`<option value="${c.slug}">${esEsc(c.name)}</option>`).join('');
