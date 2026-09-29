@@ -6,13 +6,14 @@
 //   download → any team member: presigned GET (10 min) with "save as" filename
 //   delete   → superadmin: removes files queued in storage_cleanup that no video uses any more
 //   migrate  → owner only: copies one video from Supabase Storage to B2 and switches the row over
+//   sweep    → owner only: deletes files (Supabase + B2) that no video uses any more, older than 24 h
 // Secrets: B2_KEY_ID, B2_APP_KEY, B2_BUCKET, B2_ENDPOINT (e.g. s3.us-west-004.backblazeb2.com), optional B2_REGION, B2_MAX_MB
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { AwsClient } from "npm:aws4fetch@1.0.20";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
-const env = (k: string) => Deno.env.get(k) || "";
+const env = (k: string) => (Deno.env.get(k) || "").trim();   // trim: pasted secrets often carry a stray newline
 const EXT: Record<string, string> = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", m4v: "video/x-m4v", mkv: "video/x-matroska" };
 export const PREFIX = "b2:";
 export const isB2 = (p: unknown) => typeof p === "string" && p.startsWith(PREFIX) && /^b2:videos\/[\w\-/.]+$/.test(p) && !p.includes("..");
@@ -32,7 +33,20 @@ function b2() {
     for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v);
     return (await aws.sign(new Request(u, { method }), { aws: { signQuery: true } })).url;
   };
-  return { aws, url, presign };
+  return { aws, url, presign, bucketUrl: `${proto}://${endpoint}/${bucket}` };
+}
+
+// B2 buckets are always versioned: a plain DELETE only "hides" a file. Remove every version so it is really gone.
+async function removeAll(s3: ReturnType<typeof b2>, key: string) {
+  const list = await s3.aws.fetch(`${s3.bucketUrl}/?versions=&prefix=${encodeURIComponent(key)}`);
+  if (!list.ok) return false;
+  const xml = await list.text();
+  const ids = [...xml.matchAll(/<(?:Version|DeleteMarker)>([\s\S]*?)<\/(?:Version|DeleteMarker)>/g)]
+    .map(m => ({ k: m[1].match(/<Key>([\s\S]*?)<\/Key>/)?.[1], v: m[1].match(/<VersionId>([\s\S]*?)<\/VersionId>/)?.[1] }))
+    .filter(x => x.k === key && x.v);
+  let ok = true;
+  for (const { v } of ids) { const r = await s3.aws.fetch(`${s3.url(key)}?versionId=${encodeURIComponent(v!)}`, { method: "DELETE" }); if (!r.ok && r.status !== 404) ok = false; }
+  return ok;
 }
 
 Deno.serve(async (req) => {
@@ -88,8 +102,7 @@ Deno.serve(async (req) => {
       const s3 = b2(), deleted: string[] = [], kept: string[] = [];
       for (const p of (queued || []).map((r: { path: string }) => r.path)) {
         if (inUse.has(p)) { kept.push(p); continue; }
-        const r = await s3.aws.fetch(s3.url(keyOf(p)), { method: "DELETE" });
-        if (r.ok || r.status === 404) deleted.push(p); else kept.push(p);
+        if (await removeAll(s3, keyOf(p))) deleted.push(p); else kept.push(p);
       }
       if (deleted.length || kept.length) await admin.from("storage_cleanup").delete().in("path", [...deleted, ...kept.filter(p => inUse.has(p))]);
       return json({ deleted, kept });
@@ -113,8 +126,68 @@ Deno.serve(async (req) => {
       if (!put.ok) return json({ error: `B2 upload failed (${put.status})` }, 502);
       // switch the row over as the owner (keeps all normal rules); the old Supabase file gets queued for cleanup by the database
       const { error: ue } = await caller.from("videos").update({ video_url: PREFIX + key }).eq("id", v.id);
-      if (ue) { await s3.aws.fetch(s3.url(key), { method: "DELETE" }); return json({ error: ue.message }, 400); }
+      if (ue) { await removeAll(s3, key); return json({ error: ue.message }, 400); }
       return json({ status: "moved", path: PREFIX + key });
+    }
+
+    if (action === "sweep") {
+      // Owner only: find files in Supabase Storage and B2 that no video uses any more (e.g. thumbnails of deleted
+      // videos, half-finished uploads) and delete them. dryRun:true only counts. Files younger than 24 h are skipped
+      // so uploads in progress are never touched.
+      const { data: top } = await caller.rpc("can_manage_all");
+      if (!top) return json({ error: "Only the owner can clean up storage" }, 403);
+      const dry = body.dryRun !== false, cutoff = Date.now() - (env("SWEEP_MIN_AGE_H") === "" ? 24 : +env("SWEEP_MIN_AGE_H")) * 3600e3;
+      const used = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await admin.from("videos").select("video_url,thumbnail_url").range(from, from + 999);
+        if (error) return json({ error: error.message }, 400);
+        for (const r of data || []) for (const u of [r.video_url, r.thumbnail_url]) { if (isB2(u)) used.add(u); const sp = supaPath(u); if (sp) used.add(sp); }
+        if (!data || data.length < 1000) break;
+      }
+      // --- Supabase Storage (thumbnails + old videos)
+      const supa: { path: string; size: number }[] = [];
+      const walk = async (prefix: string): Promise<void> => {
+        for (let off = 0; ; off += 1000) {
+          const { data, error } = await admin.storage.from("videos").list(prefix, { limit: 1000, offset: off });
+          if (error) throw new Error("Storage list: " + error.message);
+          for (const o of data || []) {
+            const full = prefix ? `${prefix}/${o.name}` : o.name;
+            if (!o.id) { await walk(full); continue; }                                   // folder
+            const t = Date.parse(o.created_at || o.updated_at || "") || 0;
+            if (!used.has(full) && t && t < cutoff) supa.push({ path: full, size: +(o.metadata?.size || 0) });
+          }
+          if (!data || data.length < 1000) break;
+        }
+      };
+      await walk("");
+      // --- B2 (all versions under videos/)
+      const b2Orphans: { key: string; size: number }[] = [];
+      let s3: ReturnType<typeof b2> | null = null; try { s3 = b2(); } catch { s3 = null; }
+      if (s3) {
+        let km = "", vm = "";
+        const seen = new Map<string, { size: number; newest: number }>();
+        for (let i = 0; i < 100; i++) {
+          const q = `${s3.bucketUrl}/?versions=&prefix=videos%2F${km ? `&key-marker=${encodeURIComponent(km)}` : ""}${vm ? `&version-id-marker=${encodeURIComponent(vm)}` : ""}`;
+          const r = await s3.aws.fetch(q); if (!r.ok) throw new Error(`B2 list failed (${r.status})`);
+          const xml = await r.text();
+          for (const m of xml.matchAll(/<(Version|DeleteMarker)>([\s\S]*?)<\/\1>/g)) {
+            const k = m[2].match(/<Key>([\s\S]*?)<\/Key>/)?.[1] || ""; const t = Date.parse(m[2].match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1] || "") || 0;
+            const sz = +(m[2].match(/<Size>(\d+)<\/Size>/)?.[1] || 0); const e = seen.get(k) || { size: 0, newest: 0 };
+            seen.set(k, { size: e.size + sz, newest: Math.max(e.newest, t) });
+          }
+          if (!/<IsTruncated>true<\/IsTruncated>/.test(xml)) break;
+          km = xml.match(/<NextKeyMarker>([\s\S]*?)<\/NextKeyMarker>/)?.[1] || ""; vm = xml.match(/<NextVersionIdMarker>([\s\S]*?)<\/NextVersionIdMarker>/)?.[1] || "";
+          if (!km) break;
+        }
+        for (const [k, v] of seen) if (!used.has(PREFIX + k) && v.newest && v.newest < cutoff) b2Orphans.push({ key: k, size: v.size });
+      }
+      const bytes = supa.reduce((a, x) => a + x.size, 0) + b2Orphans.reduce((a, x) => a + x.size, 0);
+      if (!dry) {
+        for (let i = 0; i < supa.length; i += 100) { const { error } = await admin.storage.from("videos").remove(supa.slice(i, i + 100).map(x => x.path)); if (error) throw new Error("Storage delete: " + error.message); }
+        for (const o of b2Orphans) await removeAll(s3!, o.key);
+        await admin.from("storage_cleanup").delete().in("path", [...supa.map(x => x.path), ...b2Orphans.map(x => PREFIX + x.key)]);
+      }
+      return json({ dryRun: dry, supabase: supa.length, b2: b2Orphans.length, bytes, b2Checked: !!s3, sample: [...supa.map(x => x.path), ...b2Orphans.map(x => PREFIX + x.key)].slice(0, 50) });
     }
 
     return json({ error: "Unknown action" }, 400);

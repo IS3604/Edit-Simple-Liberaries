@@ -184,13 +184,28 @@ function renderDash() {
 // ---------------- VIDEO STORAGE (owner only): move old Supabase videos to B2 ----------------
 let migrating = false, stopMigrate = false;
 function renderStorage() {
-  const box = $('#storageBox'); if (!topLevel || !useB2()) return box.classList.add('hidden');
+  const box = $('#storageBox'); if (!topLevel) return box.classList.add('hidden');
   const onSup = videos.filter(v => v.video_url && !v._b2 && storagePath(v.video_url)), onB2 = videos.filter(v => v._b2);
   box.classList.remove('hidden');
   if (migrating) return;
   box.innerHTML = `<div class="flex flex-wrap items-center gap-3"><span class="material-symbols-outlined text-primary">cloud_sync</span><div class="flex-1 min-w-[200px]"><p class="font-semibold">Video storage</p><p class="text-sm text-on-surface-variant"><b>${onB2.length}</b> in Backblaze B2 · <b>${onSup.length}</b> still in Supabase</p></div>
-    ${onSup.length ? `<button id="migBtn" class="bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold">Move ${onSup.length} to B2</button>` : '<span class="text-sm text-green-700 font-medium">✓ All videos are in B2</span>'}</div><p id="migStat" class="text-sm mt-3 empty:hidden"></p>`;
+    ${!useB2() ? '' : onSup.length ? `<button id="migBtn" class="bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold">Move ${onSup.length} to B2</button>` : '<span class="text-sm text-green-700 font-medium">✓ All videos are in B2</span>'}
+    <button id="sweepBtn" class="border border-outline-variant rounded-lg px-4 py-2 text-sm font-semibold hover:border-primary hover:text-primary">Clean up unused files</button></div><p id="migStat" class="text-sm mt-3 empty:hidden"></p>`;
   const b = $('#migBtn'); if (b) b.onclick = () => migrateAll(onSup);
+  $('#sweepBtn').onclick = sweepStorage;
+}
+const mb = n => n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : (n / 1048576).toFixed(1) + ' MB';
+async function sweepStorage() {
+  const btn = $('#sweepBtn'), st = $('#migStat'); btn.disabled = true; st.textContent = 'Checking storage for files no video uses…';
+  const run = async dryRun => { const { data, error } = await sb.functions.invoke('b2-sign', { body: { action: 'sweep', dryRun } }); if (error || data?.error) throw new Error(data?.error || await fnError(error)); return data; };
+  try {
+    const d = await run(true), n = d.supabase + d.b2;
+    if (!n) { st.textContent = '✓ No unused files found' + (d.b2Checked ? '' : ' (B2 not set up — only Supabase checked)') + '.'; return; }
+    st.textContent = `Found ${n} unused file(s) — ${d.supabase} in Supabase, ${d.b2} in B2 (${mb(d.bytes)}).`;
+    if (!confirm(`Delete ${n} unused file(s) (${mb(d.bytes)})? Files used by any video are never touched.`)) return;
+    st.textContent = 'Deleting…'; const r = await run(false);
+    st.textContent = `✓ Deleted ${r.supabase + r.b2} unused file(s), freed ${mb(r.bytes)}.`; toast('Storage cleaned up');
+  } catch (e) { st.innerHTML = `<span class="text-error">${esc(e.message)}</span>`; } finally { btn.disabled = false; }
 }
 async function migrateAll(list) {
   if (!confirm(`Move ${list.length} video(s) from Supabase to B2? Keep this tab open until it finishes.`)) return;
