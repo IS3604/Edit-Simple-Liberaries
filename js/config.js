@@ -4,5 +4,5 @@ window.ES_CONFIG = {
   // Cloudflare Turnstile site key (public). Leave "" to switch the CAPTCHA off.
   TURNSTILE_SITE_KEY: "",
   // Where NEW video uploads go: "supabase" or "b2" (Backblaze). Existing videos play from wherever they are.
-  VIDEO_STORAGE: "supabase"
+  VIDEO_STORAGE: "b2"
 };
