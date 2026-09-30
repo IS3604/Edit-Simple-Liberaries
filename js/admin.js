@@ -190,11 +190,32 @@ function renderStorage() {
   if (migrating) return;
   box.innerHTML = `<div class="flex flex-wrap items-center gap-3"><span class="material-symbols-outlined text-primary">cloud_sync</span><div class="flex-1 min-w-[200px]"><p class="font-semibold">Video storage</p><p class="text-sm text-on-surface-variant"><b>${onB2.length}</b> in Backblaze B2 · <b>${onSup.length}</b> still in Supabase</p></div>
     ${!useB2() ? '' : onSup.length ? `<button id="migBtn" class="bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold">Move ${onSup.length} to B2</button>` : '<span class="text-sm text-green-700 font-medium">✓ All videos are in B2</span>'}
-    <button id="sweepBtn" class="border border-outline-variant rounded-lg px-4 py-2 text-sm font-semibold hover:border-primary hover:text-primary">Clean up unused files</button></div><p id="migStat" class="text-sm mt-3 empty:hidden"></p>`;
+    <button id="sweepBtn" class="border border-outline-variant rounded-lg px-4 py-2 text-sm font-semibold hover:border-primary hover:text-primary">Clean up unused files</button></div><p id="migStat" class="text-sm mt-3 empty:hidden"></p><div id="usageMeters" class="grid gap-3 sm:grid-cols-3 mt-4"></div>`;
+  paintUsage(); loadStorageUsage();
   const b = $('#migBtn'); if (b) b.onclick = () => migrateAll(onSup);
   $('#sweepBtn').onclick = sweepStorage;
 }
-const mb = n => n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : (n / 1048576).toFixed(1) + ' MB';
+// Owner: how much of each plan is used / left (database, Supabase Storage, B2)
+let storageUse = null, storageUseAt = 0;
+async function loadStorageUsage(force) {
+  if (!topLevel || (!force && Date.now() - storageUseAt < 120e3)) return; storageUseAt = Date.now();
+  const [a, b] = await Promise.all([sb.rpc('storage_usage'), useB2() ? sb.functions.invoke('b2-sign', { body: { action: 'usage' } }).catch(e => ({ error: e })) : Promise.resolve({ data: { configured: false } })]);
+  storageUse = { db: a.error ? null : a.data, dbErr: a.error?.message, b2: b.error || b.data?.error ? null : b.data };
+  paintUsage();
+}
+function paintUsage() { const el = $('#usageMeters'); if (!el) return; const L = (window.ES_CONFIG || {}).LIMITS || {}, u = storageUse;
+  const meter = (icon, label, used, limit, sub) => { if (used == null) return `<div class="rounded-xl bg-surface-container-low p-4 text-sm"><p class="font-semibold flex items-center gap-1.5"><span class="material-symbols-outlined !text-lg text-primary">${icon}</span>${label}</p><p class="text-on-surface-variant mt-2">${sub}</p></div>`;
+    const pc = limit ? Math.min(100, used / limit * 100) : 0, left = Math.max(0, limit - used), col = pc > 90 ? 'bg-error' : pc > 70 ? 'bg-amber-500' : 'bg-[#e0701f]';
+    return `<div class="rounded-xl bg-surface-container-low p-4"><p class="text-sm font-semibold flex items-center gap-1.5"><span class="material-symbols-outlined !text-lg text-primary">${icon}</span>${label}</p>
+      <p class="mt-2"><span class="text-xl font-bold tabular-nums">${mb(left)}</span> <span class="text-sm text-on-surface-variant">left of ${mb(limit)}</span></p>
+      <div class="h-2 mt-2 rounded-full bg-surface-container overflow-hidden" role="meter" aria-valuenow="${pc.toFixed(0)}" aria-valuemin="0" aria-valuemax="100" aria-label="${label} used"><div class="h-full rounded-full ${col}" style="width:${pc.toFixed(1)}%"></div></div>
+      <p class="text-xs text-on-surface-variant mt-1.5">${mb(used)} used (${pc.toFixed(0)}%)${sub ? ' · ' + sub : ''}</p></div>`; };
+  if (!u) { el.innerHTML = skCards(3, 24); return; }
+  el.innerHTML = meter('database', 'Database', u.db?.db_bytes ?? null, (L.DATABASE_MB || 500) * 1048576, u.db ? `${u.db.videos} videos` : (/storage_usage|function/.test(u.dbErr || '') ? 'run usage-v7.sql' : 'unavailable'))
+    + meter('photo_library', 'Supabase Storage', u.db?.storage_bytes ?? null, (L.SUPABASE_STORAGE_MB || 1024) * 1048576, u.db ? `${u.db.storage_files} files (thumbnails${u.db.videos - u.db.videos_b2 ? ' + older videos' : ''})` : 'unavailable')
+    + meter('cloud', 'Backblaze B2 (videos)', u.b2?.configured ? u.b2.bytes : null, (L.B2_GB || 10) * 1073741824, u.b2?.configured ? `${u.b2.files} files` : useB2() ? 'could not reach B2' : 'not in use');
+}
+const mb = n => n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
 async function sweepStorage() {
   const btn = $('#sweepBtn'), st = $('#migStat'); btn.disabled = true; st.textContent = 'Checking storage for files no video uses…';
   const run = async dryRun => { const { data, error } = await sb.functions.invoke('b2-sign', { body: { action: 'sweep', dryRun } }); if (error || data?.error) throw new Error(data?.error || await fnError(error)); return data; };
@@ -517,7 +538,7 @@ function openVideo(v) {
 }
 $('#newVideo').onclick = () => openVideo();
 $$('#vmodal [data-close], #cmodal [data-close]').forEach(b => b.onclick = () => b.closest('.fixed').classList.add('hidden'));
-document.addEventListener('keydown', e => { if (e.key === 'Escape') ['#vmodal', '#cmodal'].forEach(s => $(s).classList.add('hidden')); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') ['#vmodal', '#cmodal', '#mdrawer'].forEach(s => $(s)?.classList.add('hidden')); });
 
 // Estimate frame rate by sampling decoded frames (Chrome/Edge/Safari); falls back to 30
 function detectFps(vid) {
@@ -555,21 +576,24 @@ $('#vform').vfile.onchange = e => {
   };
 };
 
-async function upload(fileOrBlob, name, label) {
-  $('#ptext').textContent = 'Uploading ' + label + '…';
-  if (label === 'video' && useB2()) return uploadB2(fileOrBlob, name);
-  const path = `${me.id.slice(0, 8)}/${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9.]+/g, '-')}`;
+// onProgress(fraction 0..1) is optional; without it the single-upload form's progress bar is used
+async function upload(fileOrBlob, name, label, onProgress) {
+  if (!onProgress) $('#ptext').textContent = 'Uploading ' + label + '…';
+  if (label === 'video' && useB2()) return uploadB2(fileOrBlob, name, onProgress);
+  const path = `${me.id.slice(0, 8)}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${name.toLowerCase().replace(/[^a-z0-9.]+/g, '-')}`;
   const { error } = await sb.storage.from('videos').upload(path, fileOrBlob, { upsert: false, contentType: fileOrBlob.type || undefined, cacheControl: '31536000' });
   if (error) throw new Error(label + ': ' + error.message);
+  onProgress?.(1);
   return sb.storage.from('videos').getPublicUrl(path).data.publicUrl;
 }
 // Browser → B2 directly (the server only signs a 15-minute upload link), with a real progress bar
-async function uploadB2(file, name) {
+async function uploadB2(file, name, onProgress) {
   const { data, error } = await sb.functions.invoke('b2-sign', { body: { action: 'upload', name, size: file.size } });
   if (error || !data?.url) throw new Error('video: ' + (data?.error || await fnError(error) || 'could not start upload'));
   await new Promise((ok, bad) => {
     const x = new XMLHttpRequest(); x.open('PUT', data.url); x.setRequestHeader('Content-Type', data.contentType || file.type || 'application/octet-stream');
-    x.upload.onprogress = e => { if (e.lengthComputable) { const pc = e.loaded / e.total; $('#bar').style.width = (10 + pc * 60).toFixed(0) + '%'; $('#ptext').textContent = `Uploading video… ${Math.round(pc * 100)}%`; } };
+    x.upload.onprogress = e => { if (!e.lengthComputable) return; const pc = e.loaded / e.total;
+      if (onProgress) onProgress(pc); else { $('#bar').style.width = (10 + pc * 60).toFixed(0) + '%'; $('#ptext').textContent = `Uploading video… ${Math.round(pc * 100)}%`; } };
     x.onload = () => x.status >= 200 && x.status < 300 ? ok() : bad(new Error(`video: storage refused the upload (${x.status})`));
     x.onerror = () => bad(new Error('video: upload failed — check your connection'));
     x.send(file);
@@ -607,6 +631,122 @@ $('#vform').onsubmit = async e => {
   } catch (err) { toast(err.message, 1); $('#ptext').textContent = err.message; }
   btns.forEach(b => b.disabled = false);
 };
+
+// ---------------- BULK UPLOAD ----------------
+// Many files (or a whole folder) at once. Per file: read metadata + thumbnail → fingerprint (skip/variant duplicates)
+// → AI description & tags from the title → upload video + thumbnail → save. Two files at a time; errors don't stop the rest.
+const VIDEO_EXT = /\.(mp4|mov|webm|m4v|mkv)$/i;
+const titleFromName = n => n.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()).slice(0, 120) || 'Untitled video';
+let bq = [], bRunning = false, bStop = false;
+const bRow = it => { const col = { waiting: 'text-on-surface-variant', done: 'text-green-700', skipped: 'text-on-surface-variant', failed: 'text-error' }[it.state] || 'text-primary';
+  return `<li data-b="${it.id}" class="px-3 py-2.5 flex items-center gap-3 text-sm">
+    <span class="material-symbols-outlined !text-xl ${col}">${{ done: 'check_circle', failed: 'error', skipped: 'block', waiting: 'movie' }[it.state] || 'progress_activity'}</span>
+    <div class="flex-1 min-w-0"><p class="font-medium truncate">${esc(it.saved || titleFromName(it.file.name))}</p>
+      <p class="text-xs ${col} truncate">${esc(it.path || it.file.name)} · ${mb(it.file.size)}${it.msg ? ' · ' + esc(it.msg) : ''}</p>
+      ${it.state === 'working' ? `<div class="h-1 mt-1 rounded-full bg-surface-container overflow-hidden"><div class="h-full bg-primary" style="width:${Math.round((it.pc || 0) * 100)}%"></div></div>` : ''}</div>
+    ${!bRunning && it.state === 'waiting' ? `<button data-brm="${it.id}" class="material-symbols-outlined !text-lg text-on-surface-variant hover:text-error" aria-label="Remove">close</button>` : ''}</li>`; };
+function bPaint(one) {
+  if (one) { const li = $(`#blist [data-b="${one.id}"]`); if (li) { li.outerHTML = bRow(one); } }
+  else $('#blist').innerHTML = bq.map(bRow).join('');
+  const n = k => bq.filter(x => x.state === k).length, done = n('done') + n('skipped') + n('failed');
+  $('#bsum').textContent = !bq.length ? 'No videos chosen' : bRunning ? `Uploading… ${done} of ${bq.length} finished` :
+    done ? `${n('done')} uploaded · ${n('skipped')} skipped · ${n('failed')} failed${n('waiting') ? ` · ${n('waiting')} waiting` : ''}` : `${bq.length} video${bq.length === 1 ? '' : 's'} ready (${mb(bq.reduce((a, x) => a + x.file.size, 0))})`;
+  $('#bbar').classList.toggle('hidden', !bRunning && !done); $('#bbar > div').style.width = (bq.length ? done / bq.length * 100 : 0) + '%';
+  $('#bstart').disabled = bRunning || !n('waiting'); $('#bstart').textContent = done && n('waiting') ? 'Upload remaining' : 'Upload';
+  $('#bstop').classList.toggle('hidden', !bRunning); $('#bretry').classList.toggle('hidden', bRunning || !n('failed'));
+  $('#bclear').classList.toggle('hidden', bRunning || !bq.length); $$('#bSetup select, #bSetup input').forEach(x => x.disabled = bRunning || (x.id === 'bsub' && !$('#bcat').value));
+}
+function bAdd(files) {
+  let skipped = 0; const have = new Set(bq.map(x => x.file.name + '|' + x.file.size));
+  for (const f of files) { if (!VIDEO_EXT.test(f.name) && !/^video\//.test(f.type)) { skipped++; continue; } const k = f.name + '|' + f.size; if (have.has(k)) continue; have.add(k);
+    bq.push({ id: Math.random().toString(36).slice(2, 9), file: f, path: f.webkitRelativePath || f._path || '', state: 'waiting' }); }
+  bq.sort((a, b) => a.state !== 'waiting' || b.state !== 'waiting' ? 0 : (a.path || a.file.name).localeCompare(b.path || b.file.name, undefined, { numeric: true }));
+  if (skipped) toast(`${skipped} non-video file(s) ignored`); bPaint();
+}
+async function entryFiles(entry, path = '') {                                   // drag & drop folders
+  if (entry.isFile) return new Promise(r => entry.file(f => { f._path = path + f.name; r([f]); }, () => r([])));
+  if (!entry.isDirectory) return [];
+  const rd = entry.createReader(), all = []; let batch;
+  do { batch = await new Promise(r => rd.readEntries(r, () => r([]))); all.push(...batch); } while (batch.length);
+  return (await Promise.all(all.map(e => entryFiles(e, path + entry.name + '/')))).flat();
+}
+function analyzeFile(file) {                                                    // duration, size class, orientation, fps, thumbnail
+  return new Promise((ok, bad) => {
+    const vid = document.createElement('video'), url = URL.createObjectURL(file); vid.muted = true; vid.playsInline = true; vid.preload = 'auto'; vid.src = url;
+    const fail = () => { URL.revokeObjectURL(url); bad(new Error("can't read this video in the browser")); }; const t = setTimeout(fail, 30000);
+    vid.onerror = () => { clearTimeout(t); fail(); };
+    vid.onloadedmetadata = async () => {
+      const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h), meta = { duration_seconds: Math.round(vid.duration) || 0, resolution: big >= 3000 ? '4K' : big >= 1800 ? '1080p' : '720p', orientation: w > h ? 'horizontal' : w < h ? 'vertical' : 'square' };
+      meta.fps = await detectFps(vid).catch(() => 30);
+      vid.onseeked = () => { const cv = document.createElement('canvas'), sc = Math.min(1, 1280 / (w || 1280)); cv.width = (w || 1280) * sc; cv.height = (h || 720) * sc;
+        try { cv.getContext('2d').drawImage(vid, 0, 0, cv.width, cv.height); } catch { }
+        cv.toBlob(b => { clearTimeout(t); URL.revokeObjectURL(url); ok({ ...meta, thumb: b }); }, 'image/jpeg', 0.82); };
+      vid.pause(); vid.currentTime = Math.min(1, (vid.duration || 3) / 3);
+    };
+  });
+}
+async function aiFor(title) {                                                   // same server function as the single form
+  for (let i = 0; i < 2; i++) { try { const { data, error } = await sb.functions.invoke('ai-describe', { body: { title } }); if (!error && data && !data.error) return data; } catch { } }
+  return null;
+}
+async function bOne(it, opts, seen) {
+  const set = (msg, pc) => { it.msg = msg; if (pc !== undefined) it.pc = pc; bPaint(it); };
+  it.state = 'working'; set('Reading video…', 0.02);
+  const max = (useB2() ? 500 : 50) * 1024 * 1024; if (it.file.size > max) throw new Error(`over ${useB2() ? 500 : 50} MB`);
+  const meta = await analyzeFile(it.file);
+  set('Checking for duplicates…', 0.05); const hash = await fingerprint(it.file).catch(() => null);
+  if (hash) {
+    if (seen.has(hash)) { if (opts.skip) { it.state = 'skipped'; return set('same file twice in this batch'); } }
+    seen.add(hash);
+    const { data: hit } = await sb.from('videos').select('id,title').eq('file_hash', hash).limit(1);
+    if (hit?.length && opts.skip) { it.state = 'skipped'; return set(`already in library as “${hit[0].title}”`); }
+  }
+  const title = titleFromName(it.file.name);
+  set('Writing description & tags…', 0.08); const ai = await aiFor(title);
+  set('Uploading video…', 0.1);
+  const video_url = await upload(it.file, it.file.name, 'video', pc => set(`Uploading video… ${Math.round(pc * 100)}%`, 0.1 + pc * 0.8));
+  set('Uploading thumbnail…', 0.92); const thumbnail_url = meta.thumb ? await upload(meta.thumb, 'thumb.jpg', 'thumbnail', () => { }) : null;
+  const row = { title, description: ai?.description || '', tags: ai?.tags || [], category: opts.cat, subcategory: opts.sub, duration_seconds: meta.duration_seconds, resolution: meta.resolution, fps: meta.fps || 30, orientation: meta.orientation, file_hash: hash, video_url, thumbnail_url };
+  if (isSuper()) { row.status = 'approved'; row.published = opts.mode === 'approve'; } else row.published = true;
+  set('Saving…', 0.97);
+  const { data: saved, error } = await sb.from('videos').insert(row).select('title').maybeSingle();
+  if (error) { if (isSuper()) cleanStorage(); throw new Error(error.message); }
+  it.saved = saved?.title || title; it.state = 'done'; it.pc = 1;
+  set([saved && saved.title !== title ? (/Variant \d+$/.test(saved.title) ? 'saved as a variant' : 'title was taken — renamed') : '', ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ') || (isSuper() ? (opts.mode === 'approve' ? 'live' : 'draft') : 'sent for review'));
+}
+async function bRun() {
+  const opts = { cat: $('#bcat').value, sub: $('#bsub').value, mode: $('#bpub').value, skip: $('#bskip').checked };
+  if (!opts.cat || !opts.sub) return toast('Choose a category and subcategory first', 1);
+  bRunning = true; bStop = false; $('#bstop').textContent = 'Stop'; bPaint(); const seen = new Set();
+  const next = () => bq.find(x => x.state === 'waiting');
+  const worker = async () => { let it; while (!bStop && (it = next())) { it.state = 'working'; try { await bOne(it, opts, seen); } catch (e) { it.state = 'failed'; it.msg = e.message; bPaint(it); } } };
+  await Promise.all([worker(), worker()]);
+  bRunning = false; bPaint(); loadAll();
+  const n = k => bq.filter(x => x.state === k).length;
+  toast(`Bulk upload: ${n('done')} uploaded${n('skipped') ? `, ${n('skipped')} skipped` : ''}${n('failed') ? `, ${n('failed')} failed` : ''}${bStop ? ' (stopped)' : ''}`, n('failed') > 0);
+}
+function openBulk() {
+  if (bRunning) return $('#bmodal').classList.remove('hidden');
+  bq = []; $('#bcat').innerHTML = '<option value="">Select category</option>' + mains().map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join('');
+  $('#bsub').innerHTML = '<option value="">Select subcategory</option>'; $('#bpubWrap').classList.toggle('hidden', !isSuper()); $('#bnote').classList.toggle('hidden', isSuper());
+  $('#bfiles').value = ''; $('#bfolder').value = ''; bPaint(); $('#bmodal').classList.remove('hidden');
+}
+$('#bulkVideo').onclick = openBulk;
+$('#bcat').onchange = () => { const c = $('#bcat').value; $('#bsub').innerHTML = '<option value="">Select subcategory</option>' + subsOf(c).map(x => `<option value="${esc(x.slug)}">${esc(x.name)}</option>`).join(''); bPaint(); };
+$('#bfiles').onchange = e => { bAdd([...e.target.files]); e.target.value = ''; };
+$('#bfolder').onchange = e => { bAdd([...e.target.files]); e.target.value = ''; };
+$('#bdrop').ondragover = e => { e.preventDefault(); $('#bdrop').classList.add('border-primary', 'bg-primary-fixed/30'); };
+$('#bdrop').ondragleave = () => $('#bdrop').classList.remove('border-primary', 'bg-primary-fixed/30');
+$('#bdrop').ondrop = async e => { e.preventDefault(); $('#bdrop').classList.remove('border-primary', 'bg-primary-fixed/30'); if (bRunning) return;
+  const items = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry?.()).filter(Boolean);
+  bAdd(items.length ? (await Promise.all(items.map(x => entryFiles(x)))).flat() : [...e.dataTransfer.files]); };
+$('#blist').onclick = e => { const id = e.target.closest('[data-brm]')?.dataset.brm; if (id) { bq = bq.filter(x => x.id !== id); bPaint(); } };
+$('#bclear').onclick = () => { bq = []; bPaint(); };
+$('#bstart').onclick = bRun;
+$('#bstop').onclick = () => { bStop = true; $('#bstop').textContent = 'Stopping after current…'; };
+$('#bretry').onclick = () => { bq.forEach(x => { if (x.state === 'failed') { x.state = 'waiting'; x.msg = ''; x.pc = 0; } }); bRun(); };
+$('#bClose').onclick = () => { if (bRunning && !confirm('Uploads are still running. Hide this window? They will keep going in the background.')) return; $('#bmodal').classList.add('hidden'); };
+window.addEventListener('beforeunload', e => { if (bRunning) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------------- REVIEW (superadmin) ----------------
 const FIELDS = ['title', 'description', 'content', 'category', 'subcategory', 'tags', 'resolution', 'fps', 'orientation', 'duration_seconds', 'published', 'video_url', 'thumbnail_url', 'name', 'slug', 'parent_slug', 'icon', 'blurb', 'sort'];
@@ -722,8 +862,75 @@ function renderStatus() {
     <td class="p-3 text-right">${m.uploads}</td><td class="p-3 text-right text-green-700">${m.live}</td><td class="p-3 text-right text-amber-700">${m.pending}</td><td class="p-3 text-right text-red-700">${m.rejected}</td>
     <td class="p-3 whitespace-nowrap text-on-surface-variant">${m.last_upload ? ago(m.last_upload) : '—'}</td></tr>`).join('');
 }
+// ---- Owner view: one searchable table of members + invites, inline role change, detail drawer ----
+let tq = { q: '', f: 'all', sort: 'active' }, memberDl = {}, memberDlAt = 0;
+async function loadMemberDownloads() { if (!topLevel || Date.now() - memberDlAt < 120e3) return; memberDlAt = Date.now();
+  const { data } = await sb.rpc('download_stats', { p_days: 30 }); memberDl = {}; (data?.by_member || []).forEach(m => memberDl[m.email] = m.n); if (!$('#t-team').classList.contains('hidden')) renderTeamMaster(); }
+function renderTeamMaster() {
+  const box = $('#teamFull'); if (!box.dataset.ready) {
+    box.innerHTML = `<div class="flex flex-wrap items-center gap-2 mb-3"><label class="flex-1 min-w-[200px] flex items-center gap-2 bg-white border border-outline-variant rounded-lg px-3"><span class="material-symbols-outlined text-on-surface-variant !text-xl">search</span><input id="tmq" type="search" placeholder="Search by email" class="flex-1 border-0 focus:ring-0 py-2 text-sm"></label>
+      <select id="tmf" aria-label="Filter" class="rounded-lg border-outline-variant text-sm"><option value="all">Everyone</option><option value="superadmin">Superadmins</option><option value="admin">Admins</option><option value="invited">Invited / not joined</option><option value="idle">Inactive 30+ days</option></select>
+      <select id="tms" aria-label="Sort" class="rounded-lg border-outline-variant text-sm"><option value="active">Recently active</option><option value="uploads">Most uploads</option><option value="downloads">Most downloads</option><option value="name">Email A–Z</option></select>
+      <button id="tmInv" class="bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-1.5"><span class="material-symbols-outlined !text-lg">person_add</span>Invite member</button></div>
+      <div id="tmForm" class="hidden mb-4"></div>
+      <div class="bg-white rounded-xl border border-outline-variant/40 overflow-x-auto"><table class="mtable w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Member</th><th class="p-3">Role</th><th class="p-3">Status</th><th class="p-3">Last sign-in</th><th class="p-3">Uploads</th><th class="p-3 text-right">Downloads <span class="font-normal">(30d)</span></th><th class="p-3"></th></tr></thead><tbody id="tmRows"></tbody></table>
+      <p id="tmEmpty" class="hidden p-6 text-center text-sm text-on-surface-variant">No members match.</p></div>`;
+    box.dataset.ready = '1'; $('#tmForm').appendChild($('#addAdmin'));
+    $('#tmq').oninput = e => { tq.q = e.target.value.toLowerCase(); renderTeamMaster(); };
+    $('#tmf').onchange = e => { tq.f = e.target.value; renderTeamMaster(); };
+    $('#tms').onchange = e => { tq.sort = e.target.value; renderTeamMaster(); };
+    $('#tmInv').onclick = () => { const f = $('#tmForm'); f.classList.toggle('hidden'); if (!f.classList.contains('hidden')) $('#addAdmin').email.focus(); };
+    $('#tmRows').onclick = tmClick; $('#tmRows').onchange = tmRole;
+  }
+  const idle = m => !m.last_sign_in || Date.now() - new Date(m.last_sign_in) > 30 * 864e5;
+  const rows = [...status.map(m => ({ ...m, kind: 'member', dl: memberDl[m.email] || 0 })),
+    ...invites.filter(i => !status.some(m => (m.email || '').toLowerCase() === i.email.toLowerCase())).map(i => ({ kind: 'invite', email: i.email, role_label: i.role === 'superadmin' ? 'Superadmin' : 'Admin', account: 'Invited', joined: i.created_at, uploads: 0, live: 0, pending: 0, rejected: 0, dl: 0, invRole: i.role }))]
+    .filter(m => !tq.q || (m.email || '').toLowerCase().includes(tq.q))
+    .filter(m => tq.f === 'all' || (tq.f === 'invited' ? m.kind === 'invite' || m.account !== 'Active' : tq.f === 'idle' ? m.kind === 'member' && idle(m) : m.kind === 'member' && (tq.f === 'superadmin' ? m.role_label !== 'Admin' : m.role_label === 'Admin')));
+  const t = x => x ? +new Date(x) : 0;
+  rows.sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || ({ active: t(b.last_sign_in) - t(a.last_sign_in), uploads: b.uploads - a.uploads, downloads: b.dl - a.dl, name: (a.email || '').localeCompare(b.email || '') })[tq.sort]);
+  const chip = a => ({ Active: 'bg-green-100 text-green-800', Invited: 'bg-amber-100 text-amber-800', 'Invite not accepted': 'bg-amber-100 text-amber-800' }[a] || 'bg-red-100 text-red-800');
+  $('#tmRows').innerHTML = rows.map(m => { const you = m.user_id === me.id, owner = m.role_label === 'Master admin';
+    return `<tr data-m="${esc(m.user_id || '')}" class="border-b border-outline-variant/30 last:border-0 hover:bg-surface-container-lowest">
+    <td class="p-3"><button data-view="${esc(m.user_id || '')}" class="flex items-center gap-2 text-left" ${m.kind === 'invite' ? 'disabled' : ''}><span class="w-9 h-9 shrink-0 rounded-full grid place-items-center text-xs font-bold ${m.role_label === 'Admin' ? 'bg-surface-container' : 'bg-primary text-on-primary'}">${initials(m.email)}</span><span class="min-w-0"><span class="block font-medium truncate max-w-[220px] ${m.kind === 'member' ? 'hover:text-primary' : ''}">${esc(m.email)}</span><span class="block text-xs text-on-surface-variant">${[you ? 'You' : '', m.kind === 'invite' ? 'invited ' + ago(m.joined) : m.joined ? 'joined ' + new Date(m.joined).toLocaleDateString() : ''].filter(Boolean).join(' · ')}</span></span></button></td>
+    <td class="p-3">${you || owner || m.kind === 'invite' ? `<span class="text-sm">${esc(you && myTitle ? myTitle : m.role_label)}</span>` : `<select data-role="${esc(m.user_id)}" aria-label="Role for ${esc(m.email)}" class="rounded-lg border-outline-variant text-sm py-1"><option value="admin" ${m.role_label === 'Admin' ? 'selected' : ''}>Admin</option><option value="superadmin" ${m.role_label === 'Superadmin' ? 'selected' : ''}>Superadmin</option></select>`}</td>
+    <td class="p-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${chip(m.account)}">${esc(m.account)}</span></td>
+    <td class="p-3 whitespace-nowrap text-on-surface-variant">${m.last_sign_in ? ago(m.last_sign_in) : '—'}</td>
+    <td class="p-3 whitespace-nowrap"><b>${m.uploads}</b> <span class="text-xs text-on-surface-variant">(<span class="text-green-700">${m.live} live</span>${m.pending ? ` · <span class="text-amber-700">${m.pending} pending</span>` : ''}${m.rejected ? ` · <span class="text-red-700">${m.rejected} rejected</span>` : ''})</span></td>
+    <td class="p-3 text-right tabular-nums">${m.dl}</td>
+    <td class="p-3 text-right whitespace-nowrap">${m.kind === 'invite' ? `<button data-resend="${esc(m.email)}" data-irole="${esc(m.invRole)}" class="px-2 py-1 rounded text-primary font-medium hover:bg-primary-fixed/50">Resend</button><button data-uninv="${esc(m.email)}" class="px-2 py-1 rounded text-error font-medium hover:bg-red-50">Cancel</button>`
+      : `${m.account === 'Invite not accepted' ? `<button data-resend="${esc(m.email)}" data-irole="${m.role_label === 'Admin' ? 'admin' : 'superadmin'}" class="px-2 py-1 rounded text-primary font-medium hover:bg-primary-fixed/50">Resend invite</button>` : ''}<button data-view="${esc(m.user_id)}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container" title="Details">visibility</button>${you || owner ? '' : `<button data-rm="${esc(m.user_id)}" data-em="${esc(m.email)}" class="material-symbols-outlined p-1.5 rounded text-error hover:bg-red-50" title="Remove">person_remove</button>`}`}</td></tr>`; }).join('');
+  $('#tmEmpty').classList.toggle('hidden', rows.length > 0);
+}
+async function tmRole(e) { const id = e.target.dataset.role; if (!id) return; const { data, error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id).select('user_id'); if (error || !data?.length) { toast(error?.message || "You don't have permission to change this member", 1); return loadAll(); } toast('Role updated'); loadAll(); }
+async function tmClick(e) { const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.view) return openMember(b.dataset.view);
+  if (b.dataset.rm) { if (!confirm(`Remove admin access for ${b.dataset.em}? Their uploaded videos stay.`)) return; const { data, error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm).select('user_id'); if (error || !data?.length) return toast(error?.message || "Couldn't remove this member", 1); toast('Removed'); return loadAll(); }
+  if (b.dataset.resend) { b.disabled = true; await sendInvite(b.dataset.resend, b.dataset.irole); b.disabled = false; return loadAll(); }
+  if (b.dataset.uninv) { if (!confirm(`Cancel invite for ${b.dataset.uninv}?`)) return; const { error } = await sb.from('admin_invites').delete().eq('email', b.dataset.uninv); if (error) return toast(error.message, 1); loadAll(); } }
+function openMember(id) { const m = status.find(x => x.user_id === id); if (!m) return;
+  const up = videos.filter(v => v.submitted_by === id).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const st = (n, l, c = '') => `<div class="rounded-xl bg-surface-container-low p-3 text-center"><p class="text-xl font-bold ${c}">${n}</p><p class="text-xs text-on-surface-variant">${l}</p></div>`;
+  $('#mbody').innerHTML = `<div class="flex items-center gap-3"><span class="w-14 h-14 rounded-full grid place-items-center text-lg font-bold ${m.role_label === 'Admin' ? 'bg-surface-container' : 'bg-primary text-on-primary'}">${initials(m.email)}</span><div class="min-w-0"><p class="font-bold text-lg truncate">${esc(m.email)}</p><p class="text-sm text-on-surface-variant">${esc(m.user_id === me.id && myTitle ? myTitle : m.role_label)} · ${esc(m.account)}</p></div></div>
+    <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mt-5"><dt class="text-on-surface-variant">Joined</dt><dd>${m.joined ? new Date(m.joined).toLocaleDateString() : '—'}</dd><dt class="text-on-surface-variant">Last sign-in</dt><dd>${m.last_sign_in ? new Date(m.last_sign_in).toLocaleString() : 'Never'}</dd><dt class="text-on-surface-variant">Last upload</dt><dd>${m.last_upload ? ago(m.last_upload) : '—'}</dd><dt class="text-on-surface-variant">Downloads (30 days)</dt><dd>${memberDl[m.email] || 0}</dd></dl>
+    <div class="grid grid-cols-4 gap-2 mt-5">${st(m.uploads, 'Uploads')}${st(m.live, 'Live', 'text-green-700')}${st(m.pending, 'Pending', 'text-amber-700')}${st(m.rejected, 'Rejected', 'text-red-700')}</div>
+    <h3 class="font-semibold mt-6 mb-2">Recent uploads</h3>
+    <div class="space-y-2">${up.slice(0, 8).map(v => { const [l, c] = statusLabel(v); return `<div class="flex items-center gap-3"><div class="w-16 aspect-video rounded bg-surface-container overflow-hidden shrink-0">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}</div><div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${ago(v.created_at)}</p></div><span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${c}">${l}</span></div>`; }).join('') || '<p class="text-sm text-on-surface-variant">No uploads yet.</p>'}</div>
+    ${up.length > 8 ? `<p class="mt-3 text-xs text-on-surface-variant">Showing 8 of ${up.length}.</p>` : ''}`;
+  $('#mdrawer').classList.remove('hidden');
+}
+const statusLabel = v => ({ pending: ['Pending', 'bg-amber-100 text-amber-800'], rejected: ['Rejected', 'bg-red-100 text-red-800'], approved: v.published ? ['Live', 'bg-green-100 text-green-800'] : ['Draft', 'bg-surface-container text-on-surface-variant'] }[v.status] || ['', '']);
+$('#mdrawer').onclick = e => { if (e.target.id === 'mdrawer' || e.target.closest('[data-mclose]')) $('#mdrawer').classList.add('hidden'); };
+
 function renderTeam() {
-  if (!isSuper()) return; renderStatus();
+  if (!isSuper()) return;
+  $('#teamFull').classList.toggle('hidden', !topLevel); $('#teamLeft').classList.toggle('hidden', topLevel); $('#statusWrap').classList.add('hidden');
+  $('#teamGrid').classList.toggle('hidden', topLevel);
+  if (topLevel) { const idle = status.filter(m => m.last_sign_in && Date.now() - new Date(m.last_sign_in) < 7 * 864e5).length;
+    const st = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${i}</span></span><div><p class="text-2xl font-bold leading-none">${n}</p><p class="text-xs text-on-surface-variant mt-1">${l}</p></div></div>`;
+    $('#teamStats').innerHTML = st('groups', status.length, 'Members') + st('bolt', idle, 'Active this week') + st('shield_person', status.filter(m => m.role_label !== 'Admin').length, 'Superadmins & you') + st('mail', invites.length + status.filter(m => m.account === 'Invite not accepted').length, 'Not joined yet');
+    renderTeamMaster(); loadMemberDownloads(); return; }
+  renderStatus();
   const st = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${i}</span></span><div><p class="text-2xl font-bold leading-none">${n}</p><p class="text-xs text-on-surface-variant mt-1">${l}</p></div></div>`;
   $('#teamStats').innerHTML = st('groups', team.length, 'Members') + st('shield_person', team.filter(t => lvl(t.role) === 'superadmin').length, 'Superadmins') + st('person', team.filter(t => t.role === 'admin').length, 'Admins') + st('mail', invites.length, 'Pending invites');
   const sorted = [...team].sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || (lvl(a.role) === lvl(b.role) ? 0 : lvl(a.role) === 'superadmin' ? -1 : 1));

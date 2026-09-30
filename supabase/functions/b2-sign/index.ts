@@ -6,6 +6,7 @@
 //   download → any team member: presigned GET (10 min) with "save as" filename
 //   delete   → superadmin: removes files queued in storage_cleanup that no video uses any more
 //   migrate  → owner only: copies one video from Supabase Storage to B2 and switches the row over
+//   usage    → owner only: total bytes / files in the B2 bucket
 //   sweep    → owner only: deletes files (Supabase + B2) that no video uses any more, older than 24 h
 // Secrets: B2_KEY_ID, B2_APP_KEY, B2_BUCKET, B2_ENDPOINT (e.g. s3.us-west-004.backblazeb2.com), optional B2_REGION, B2_MAX_MB
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -47,6 +48,25 @@ async function removeAll(s3: ReturnType<typeof b2>, key: string) {
   let ok = true;
   for (const { v } of ids) { const r = await s3.aws.fetch(`${s3.url(key)}?versionId=${encodeURIComponent(v!)}`, { method: "DELETE" }); if (!r.ok && r.status !== 404) ok = false; }
   return ok;
+}
+
+// Every file (all versions) under videos/ → key → { size (all versions), newest }
+async function listB2(s3: ReturnType<typeof b2>) {
+  let km = "", vm = ""; const seen = new Map<string, { size: number; newest: number }>();
+  for (let i = 0; i < 200; i++) {
+    const q = `${s3.bucketUrl}/?versions=&prefix=videos%2F${km ? `&key-marker=${encodeURIComponent(km)}` : ""}${vm ? `&version-id-marker=${encodeURIComponent(vm)}` : ""}`;
+    const r = await s3.aws.fetch(q); if (!r.ok) throw new Error(`B2 list failed (${r.status})`);
+    const xml = await r.text();
+    for (const m of xml.matchAll(/<(Version|DeleteMarker)>([\s\S]*?)<\/\1>/g)) {
+      const k = m[2].match(/<Key>([\s\S]*?)<\/Key>/)?.[1] || ""; const t = Date.parse(m[2].match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1] || "") || 0;
+      const sz = +(m[2].match(/<Size>(\d+)<\/Size>/)?.[1] || 0); const e = seen.get(k) || { size: 0, newest: 0 };
+      seen.set(k, { size: e.size + sz, newest: Math.max(e.newest, t) });
+    }
+    if (!/<IsTruncated>true<\/IsTruncated>/.test(xml)) break;
+    km = xml.match(/<NextKeyMarker>([\s\S]*?)<\/NextKeyMarker>/)?.[1] || ""; vm = xml.match(/<NextVersionIdMarker>([\s\S]*?)<\/NextVersionIdMarker>/)?.[1] || "";
+    if (!km) break;
+  }
+  return seen;
 }
 
 Deno.serve(async (req) => {
@@ -130,6 +150,14 @@ Deno.serve(async (req) => {
       return json({ status: "moved", path: PREFIX + key });
     }
 
+    if (action === "usage") {
+      const { data: top } = await caller.rpc("can_manage_all");
+      if (!top) return json({ error: "Only the owner can see storage usage" }, 403);
+      let s3: ReturnType<typeof b2>; try { s3 = b2(); } catch { return json({ configured: false }); }
+      const seen = await listB2(s3); let bytes = 0; for (const v of seen.values()) bytes += v.size;
+      return json({ configured: true, bytes, files: seen.size });
+    }
+
     if (action === "sweep") {
       // Owner only: find files in Supabase Storage and B2 that no video uses any more (e.g. thumbnails of deleted
       // videos, half-finished uploads) and delete them. dryRun:true only counts. Files younger than 24 h are skipped
@@ -164,21 +192,7 @@ Deno.serve(async (req) => {
       const b2Orphans: { key: string; size: number }[] = [];
       let s3: ReturnType<typeof b2> | null = null; try { s3 = b2(); } catch { s3 = null; }
       if (s3) {
-        let km = "", vm = "";
-        const seen = new Map<string, { size: number; newest: number }>();
-        for (let i = 0; i < 100; i++) {
-          const q = `${s3.bucketUrl}/?versions=&prefix=videos%2F${km ? `&key-marker=${encodeURIComponent(km)}` : ""}${vm ? `&version-id-marker=${encodeURIComponent(vm)}` : ""}`;
-          const r = await s3.aws.fetch(q); if (!r.ok) throw new Error(`B2 list failed (${r.status})`);
-          const xml = await r.text();
-          for (const m of xml.matchAll(/<(Version|DeleteMarker)>([\s\S]*?)<\/\1>/g)) {
-            const k = m[2].match(/<Key>([\s\S]*?)<\/Key>/)?.[1] || ""; const t = Date.parse(m[2].match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1] || "") || 0;
-            const sz = +(m[2].match(/<Size>(\d+)<\/Size>/)?.[1] || 0); const e = seen.get(k) || { size: 0, newest: 0 };
-            seen.set(k, { size: e.size + sz, newest: Math.max(e.newest, t) });
-          }
-          if (!/<IsTruncated>true<\/IsTruncated>/.test(xml)) break;
-          km = xml.match(/<NextKeyMarker>([\s\S]*?)<\/NextKeyMarker>/)?.[1] || ""; vm = xml.match(/<NextVersionIdMarker>([\s\S]*?)<\/NextVersionIdMarker>/)?.[1] || "";
-          if (!km) break;
-        }
+        const seen = await listB2(s3);
         for (const [k, v] of seen) if (!used.has(PREFIX + k) && v.newest && v.newest < cutoff) b2Orphans.push({ key: k, size: v.size });
       }
       const bytes = supa.reduce((a, x) => a + x.size, 0) + b2Orphans.reduce((a, x) => a + x.size, 0);

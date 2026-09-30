@@ -4,5 +4,7 @@ window.ES_CONFIG = {
   // Cloudflare Turnstile site key (public). Leave "" to switch the CAPTCHA off.
   TURNSTILE_SITE_KEY: "0x4AAAAAAFInMoAYUypljVbb",
   // Where NEW video uploads go: "supabase" or "b2" (Backblaze). Existing videos play from wherever they are.
-  VIDEO_STORAGE: "b2"
+  VIDEO_STORAGE: "b2",
+  // Plan sizes used for the owner's "storage remaining" meters (change if you upgrade a plan)
+  LIMITS: { DATABASE_MB: 500, SUPABASE_STORAGE_MB: 1024, B2_GB: 10 }
 };

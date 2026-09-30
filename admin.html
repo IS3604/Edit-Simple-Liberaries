@@ -21,8 +21,9 @@
 <div class="relative mt-1 mb-4"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">mail</span><input name="email" type="email" autocomplete="username" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10"></div></div>
 <div class="stagger"><label class="text-sm font-medium">Password</label>
 <div class="relative mt-1 mb-6"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">lock</span><input name="password" type="password" autocomplete="current-password" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10 pr-10"><button type="button" id="pwEye" class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl" aria-label="Show password">visibility</button></div></div>
+<div id="loginCap" class="w-full min-h-[65px] flex justify-center empty:hidden mb-4"></div>
 <div class="stagger"><button id="loginBtn" class="relative w-full bg-primary text-on-primary rounded-xl py-3 font-semibold hover:brightness-95 active:scale-[.98] transition overflow-hidden"><span class="lbl">Log in</span><span class="spin hidden absolute inset-0 grid place-items-center"><span class="spinner"></span></span></button>
-<div id="loginCap" class="flex justify-center empty:hidden mt-3"></div><p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]" role="alert"></p>
+<p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]" role="alert"></p>
 <button type="button" id="forgotBtn" class="block mx-auto text-sm text-primary font-medium hover:underline">Forgot password?</button></div></form>
 <div id="loginOk" class="hidden login-card bg-white/90 backdrop-blur rounded-3xl p-10 shadow-2xl text-center">
 <svg class="check mx-auto" viewBox="0 0 52 52" width="72" height="72"><circle cx="26" cy="26" r="24" fill="none" stroke="#16a34a" stroke-width="3"/><path fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27l7 7 15-15"/></svg>
@@ -61,7 +62,7 @@
 <h2 class="font-semibold mt-10 mb-3">Live videos per subcategory</h2><div id="bySub" class="grid gap-4 md:grid-cols-3"></div></section>
 
 <section id="t-videos" class="hidden"><div class="flex flex-wrap items-center justify-between gap-3 mb-6"><h1 class="text-2xl font-bold">Videos</h1>
-<button id="newVideo" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add video</button></div>
+<div class="flex gap-2"><button id="bulkVideo" class="border border-primary text-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:bg-primary-fixed/50"><span class="material-symbols-outlined">library_add</span>Bulk upload</button><button id="newVideo" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add video</button></div></div>
 <div class="flex flex-wrap gap-2 mb-4"><input id="vq" type="search" placeholder="Search title, content, tags…" class="rounded-lg border-outline-variant basis-full sm:basis-auto flex-1 min-w-[180px] focus:ring-primary"><select id="vcat" class="flex-1 sm:flex-none min-w-0 rounded-lg border-outline-variant focus:ring-primary"></select>
 <select id="vstat" class="flex-1 sm:flex-none min-w-0 rounded-lg border-outline-variant focus:ring-primary"><option value="">All status</option><option value="live">Live</option><option value="draft">Draft</option><option value="pending">Pending review</option><option value="rejected">Rejected</option><option value="mine">My uploads</option><option value="dup">Duplicates</option></select></div>
 <div class="overflow-x-auto bg-white rounded-xl border border-outline-variant/40"><table class="mtable w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Video</th><th class="p-3">Category</th><th class="p-3">Specs</th><th class="p-3">Status</th><th id="vActTh" class="p-3 text-right">Actions</th></tr></thead><tbody id="vrows"></tbody></table></div>
@@ -86,8 +87,9 @@
 <div id="teamStats" class="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6"></div>
 <div id="statusWrap" class="hidden mb-8"><div class="flex items-center justify-between mb-3"><h2 class="font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-primary">monitoring</span>Member status</h2><span class="text-xs text-on-surface-variant">Only visible to you</span></div>
 <div class="bg-white rounded-xl border border-outline-variant/40 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Member</th><th class="p-3">Role</th><th class="p-3">Account</th><th class="p-3">Last sign-in</th><th class="p-3 text-right">Uploads</th><th class="p-3 text-right">Live</th><th class="p-3 text-right">Pending</th><th class="p-3 text-right">Rejected</th><th class="p-3">Last upload</th></tr></thead><tbody id="statusRows"></tbody></table></div></div>
-<div class="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
-<div><h2 class="font-semibold mb-3">Members</h2><div id="teamRows" class="grid gap-3 2xl:grid-cols-2"></div>
+<div id="teamFull" class="hidden"></div>
+<div id="teamGrid" class="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
+<div id="teamLeft"><h2 class="font-semibold mb-3">Members</h2><div id="teamRows" class="grid gap-3 2xl:grid-cols-2"></div>
 <h2 class="font-semibold mt-8 mb-3">Pending invites</h2><div id="inviteRows" class="space-y-2"></div></div>
 <form id="addAdmin" class="bg-white rounded-2xl border border-outline-variant/40 p-5 lg:sticky lg:top-6">
 <div class="flex items-center gap-3 mb-4"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">person_add</span></span><div><p class="font-semibold">Invite a member</p><p class="text-xs text-on-surface-variant">They'll get an email to set a password.</p></div></div>
@@ -100,6 +102,28 @@
 </main></div>
 
 <!-- VIDEO MODAL -->
+<div id="bmodal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto p-4">
+<div class="bg-white rounded-2xl w-full max-w-3xl my-8 p-5 sm:p-6 shadow-2xl">
+<div class="flex justify-between items-center mb-1"><h2 class="text-xl font-bold">Bulk upload</h2><button type="button" id="bClose" class="material-symbols-outlined" aria-label="Close">close</button></div>
+<p class="text-sm text-on-surface-variant mb-4">Add many videos at once. Titles come from the file names; description, tags and thumbnail are created automatically for each video.</p>
+<div id="bSetup">
+<div id="bdrop" class="rounded-xl border-2 border-dashed border-outline-variant p-6 text-center transition">
+<span class="material-symbols-outlined !text-4xl text-primary">cloud_upload</span>
+<p class="font-semibold mt-1">Drop videos or a folder here</p>
+<div class="mt-3 flex flex-wrap justify-center gap-2">
+<label class="cursor-pointer bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold">Choose videos<input id="bfiles" type="file" accept="video/*" multiple class="sr-only"></label>
+<label class="cursor-pointer border border-outline-variant rounded-lg px-4 py-2 text-sm font-semibold hover:border-primary">Choose a folder<input id="bfolder" type="file" webkitdirectory directory multiple class="sr-only"></label></div></div>
+<div class="grid gap-3 sm:grid-cols-3 mt-4">
+<div><label class="text-sm font-medium">Category *</label><select id="bcat" class="w-full mt-1 rounded-lg border-outline-variant focus:ring-primary"></select></div>
+<div><label class="text-sm font-medium">Subcategory *</label><select id="bsub" disabled class="w-full mt-1 rounded-lg border-outline-variant focus:ring-primary"></select></div>
+<div id="bpubWrap"><label class="text-sm font-medium">After upload</label><select id="bpub" class="w-full mt-1 rounded-lg border-outline-variant focus:ring-primary"><option value="approve">Live on website</option><option value="draft">Save as draft</option></select></div></div>
+<label class="flex items-center gap-2 mt-3 text-sm"><input id="bskip" type="checkbox" checked class="rounded text-primary focus:ring-primary">Skip videos that are already in the library</label>
+<p id="bnote" class="hidden mt-3 text-sm bg-amber-50 text-amber-900 rounded-lg px-3 py-2">Your videos will be sent to a superadmin for review.</p></div>
+<div class="flex items-center justify-between mt-5 mb-2"><p id="bsum" class="text-sm font-medium">No videos chosen</p><button id="bclear" type="button" class="text-xs font-semibold text-on-surface-variant hover:text-error">Clear list</button></div>
+<div id="bbar" class="hidden h-1.5 rounded-full bg-surface-container overflow-hidden mb-2"><div class="h-full bg-primary transition-all" style="width:0"></div></div>
+<ul id="blist" class="max-h-[45vh] overflow-y-auto divide-y divide-outline-variant/40 rounded-xl border border-outline-variant/40 empty:hidden"></ul>
+<div class="flex flex-wrap justify-end gap-2 mt-5"><button id="bstop" type="button" class="hidden border border-outline-variant rounded-lg px-4 py-2.5 font-semibold">Stop</button><button id="bretry" type="button" class="hidden border border-outline-variant rounded-lg px-4 py-2.5 font-semibold">Retry failed</button><button id="bstart" type="button" disabled class="bg-primary text-on-primary rounded-lg px-5 py-2.5 font-semibold disabled:opacity-50">Upload</button></div>
+</div></div>
 <div id="vmodal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto p-4">
 <form id="vform" class="bg-white rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl">
 <div class="flex justify-between items-center mb-2"><h2 id="vtitle" class="text-xl font-bold">Add video</h2><button type="button" data-close class="material-symbols-outlined" aria-label="Close">close</button></div>
@@ -155,6 +179,7 @@
 <div class="flex justify-end gap-2"><button type="button" data-close class="px-4 py-2.5 rounded-lg border border-outline-variant">Cancel</button><button class="px-5 py-2.5 rounded-lg bg-primary text-on-primary font-semibold">Save</button></div></form></div>
 
 <!-- PREVIEW MODAL -->
+<div id="mdrawer" class="hidden fixed inset-0 z-50 bg-black/40 flex justify-end"><aside class="bg-white w-full max-w-md h-full overflow-y-auto p-5 shadow-2xl" role="dialog" aria-label="Member details"><div class="flex justify-end"><button type="button" data-mclose class="material-symbols-outlined" aria-label="Close">close</button></div><div id="mbody"></div></aside></div>
 <div id="pmodal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div class="w-full max-w-3xl"><div class="flex justify-end mb-2"><button data-close class="material-symbols-outlined text-white" aria-label="Close">close</button></div><video id="pvid" controls class="w-full rounded-xl bg-black max-h-[80vh]"></video></div></div>
 
 <script src="js/config.js"></script><script src="js/maintenance.js"></script><script src="js/reset-cooldown.js"></script><script src="js/captcha.js"></script><script src="js/admin.js" type="module"></script>

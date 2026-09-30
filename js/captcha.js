@@ -14,7 +14,7 @@ window.esCaptcha = (() => {
     if (!KEY || !el) return { token: async () => undefined, reset() {} };
     let id = null, tok = null, waiters = [];
     const settle = t => { tok = t; waiters.splice(0).forEach(w => w(t)); };
-    const ready = load().then(ts => { id = ts.render(el, { sitekey: KEY, appearance: 'interaction-only', 'refresh-expired': 'auto',
+    const ready = load().then(ts => { id = ts.render(el, { sitekey: KEY, appearance: 'always', size: 'flexible', 'refresh-expired': 'auto',
       callback: settle, 'expired-callback': () => { tok = null; }, 'error-callback': () => { tok = null; } }); }).catch(() => {});
     return {
       async token() {
