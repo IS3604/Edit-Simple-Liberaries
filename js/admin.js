@@ -560,9 +560,10 @@ $('#vform').vfile.onchange = e => {
   if (useB2() && file.size > 500 * 1024 * 1024) toast('Warning: file is over 500 MB — it will be refused', 1);
   newBlobUrl = URL.createObjectURL(file); showPicked(newBlobUrl, file.name, 'Analysing…');
   fileHash = null; dupState = 'checking'; hashing = fingerprint(file).then(async h => { fileHash = h; await checkDuplicate(h); checkTitle(); }).catch(() => { dupState = 'ok'; });
-  if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  let weakName = false; if (!f.title.value) { const ct = cleanTitle(file.name); f.title.value = ct.title; weakName = ct.weak; }
   queueTitle();
   aiSuggest(false);                                                         // description + tags from the title
+  if (weakName) { $('#aiStat').textContent = 'File name has no words — type a title and AI will write the description.'; f.title.focus(); }
   vid.onloadedmetadata = async () => {
     f.duration_seconds.value = Math.round(vid.duration); const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h);
     f.resolution.value = big >= 3000 ? '4K' : big >= 1800 ? '1080p' : '720p'; f.orientation.value = w > h ? 'horizontal' : w < h ? 'vertical' : 'square';
@@ -594,8 +595,9 @@ async function uploadB2(file, name, onProgress) {
     const x = new XMLHttpRequest(); x.open('PUT', data.url); x.setRequestHeader('Content-Type', data.contentType || file.type || 'application/octet-stream');
     x.upload.onprogress = e => { if (!e.lengthComputable) return; const pc = e.loaded / e.total;
       if (onProgress) onProgress(pc); else { $('#bar').style.width = (10 + pc * 60).toFixed(0) + '%'; $('#ptext').textContent = `Uploading video… ${Math.round(pc * 100)}%`; } };
-    x.onload = () => x.status >= 200 && x.status < 300 ? ok() : bad(new Error(`video: storage refused the upload (${x.status})`));
-    x.onerror = () => bad(new Error('video: upload failed — check your connection'));
+    x.onload = () => x.status >= 200 && x.status < 300 ? ok() : bad(new Error(x.status === 413 ? 'Payload too large (413)' : x.status >= 500 ? `storage server error (${x.status})` : `storage refused the upload (${x.status})`));
+    x.onerror = () => bad(new Error('network: upload failed — no connection to storage (or blocked by CORS)'));
+    x.ontimeout = () => bad(new Error('network: upload timed out'));
     x.send(file);
   });
   return data.path;
@@ -603,7 +605,8 @@ async function uploadB2(file, name, onProgress) {
 async function fnError(e) { try { const b = await e?.context?.json?.(); return b?.error || e?.message; } catch { return e?.message; } }
 $('#vform').onsubmit = async e => {
   e.preventDefault(); const f = e.target, mode = isSuper() ? (e.submitter?.dataset.mode || submitMode) : 'submit';
-  const btns = $$('#vbtns button'); btns.forEach(b => b.disabled = true); $('#progress').classList.remove('hidden'); $('#bar').style.width = '10%';
+  const btns = $$('#vbtns button'); btns.forEach(b => b.disabled = true); $('#progress').classList.remove('hidden'); $('#bar').style.width = '10%'; $('#ptext').classList.remove('text-error');
+  let stage = 'Checking the form';
   try {
     const vf = f.vfile.files[0];
     if (!editing && !vf) throw new Error('Choose a video file to upload');
@@ -618,8 +621,8 @@ $('#vform').onsubmit = async e => {
       tags: [...new Set(f.tags.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))]
     };
     if (isSuper()) { row.status = 'approved'; row.published = mode === 'approve'; } else { row.published = true; }
-    if (vf) { row.file_hash = fileHash || await fingerprint(vf).catch(() => null); row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '75%'; if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail'); }
-    $('#bar').style.width = '90%'; $('#ptext').textContent = 'Saving details…';
+    if (vf) { row.file_hash = fileHash || await fingerprint(vf).catch(() => null); stage = 'Uploading the video'; row.video_url = await upload(vf, vf.name, 'video'); $('#bar').style.width = '75%'; stage = 'Uploading the thumbnail'; if (thumbBlob) row.thumbnail_url = await upload(thumbBlob, 'thumb.jpg', 'thumbnail'); }
+    $('#bar').style.width = '90%'; $('#ptext').textContent = 'Saving details…'; stage = 'Saving the video details';
     const old = editing ? { v: editing.video_url, t: editing.thumbnail_url } : {};
     if (editing && row.status === 'approved') { row.reviewed_by = me.id; row.review_note = null; }
     const { data: saved, error } = editing ? await sb.from('videos').update(row).eq('id', editing.id).select('title').maybeSingle() : await sb.from('videos').insert(row).select('title').maybeSingle();
@@ -628,38 +631,84 @@ $('#vform').onsubmit = async e => {
     if (vf) { const stale = [old.v, old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale); if (isSuper()) cleanStorage(); }
     toast(renamed + (!isSuper() ? 'Submitted — waiting for superadmin approval' : mode === 'approve' ? 'Approved — live on website' : 'Saved as draft (hidden from website)'));
     $('#bar').style.width = '100%'; $('#vmodal').classList.add('hidden'); loadAll();
-  } catch (err) { toast(err.message, 1); $('#ptext').textContent = err.message; }
+  } catch (err) { const why = stage === 'Checking the form' ? err.message : explainError(err, stage); toast(why, 1); $('#ptext').textContent = why; $('#ptext').classList.add('text-error'); $('#bar').style.width = '0%'; }
   btns.forEach(b => b.disabled = false);
 };
+
+// ---------------- UPLOAD HELPERS: clean titles, category guessing, readable errors ----------------
+// Camera / stock-site file names ("8132021-hd_1920_1080_25fps") carry no meaning. Strip the technical bits;
+// if no real words are left the title is "weak": the AI can't describe it and a person must type a title.
+const NOISE = /^(\d+|\d+x\d+|\d{3,4}p|\d+fps|fps|hd|fhd|uhd|4k|8k|sd|hq|lq|h26[45]|x26[45]|hevc|avc|prores|mp4|mov|webm|mkv|m4v|v\d+|final|edit(ed)?|copy|export(ed)?|clip|video|footage|stock|pexels|pixabay|videvo|shutterstock|istock|img|mvi|dji|gopr\d*|dsc|vid|raw|cam|camera|untitled|new|file|temp|tmp)$/i;
+function cleanTitle(fileName) {
+  const words = String(fileName || '').replace(/\.[^.]+$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').split(/[\s_\-.()[\]{}+,]+/).filter(Boolean);
+  const keep = words.filter(w => /^\d{1,3}$/.test(w) || (!NOISE.test(w) && /[a-z]{2,}/i.test(w) && !/^[a-z]?\d+[a-z]?$/i.test(w)));   // short numbers ("Scene 2") stay
+  const real = keep.filter(w => /[aeiou]/i.test(w) && w.replace(/\d/g, '').length >= 3);
+  const title = keep.join(' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()).slice(0, 120);
+  return real.length ? { title, weak: false } : { title: '', weak: true };
+}
+// Local fallback when the AI can't choose: score each subcategory by matching words (+ a few synonyms per main category)
+const CAT_HINTS = { lawyers: 'law legal lawyer lawyers attorney attorneys court courtroom judge gavel justice contract contracts signing notary firm advocate verdict trial jury scales document documents legal-office', doctors: 'doctor doctors medical medicine hospital clinic nurse nurses patient patients surgery surgeon health healthcare stethoscope pharmacy lab laboratory xray x-ray mri scan dentist therapy care' };
+function guessCategory(text, onlyCat) {
+  const w = new Set(String(text || '').toLowerCase().split(/[^a-z0-9-]+/).filter(x => x.length > 2)); if (!w.size) return null;
+  const hit = str => String(str || '').toLowerCase().split(/[^a-z0-9-]+/).filter(x => x.length > 2 && w.has(x)).length;
+  let best = null;
+  for (const m of mains()) { if (onlyCat && m.slug !== onlyCat) continue;
+    const base = hit(m.name + ' ' + m.slug + ' ' + (CAT_HINTS[m.slug] || ''));
+    for (const sb_ of subsOf(m.slug)) { const sc = base + 2 * hit(sb_.name + ' ' + sb_.slug); if (sc > 0 && (!best || sc > best.sc)) best = { cat: m.slug, sub: sb_.slug, sc }; }
+    if (base > 0 && (!best || base > best.sc)) best = { cat: m.slug, sub: subsOf(m.slug)[0]?.slug || '', sc: base };
+  }
+  return best && best.sub ? best : null;
+}
+const catTree = () => mains().map(m => ({ slug: m.slug, name: m.name, subs: subsOf(m.slug).map(x => ({ slug: x.slug, name: x.name })) }));
+// Turn any error into a sentence a person can act on, saying WHICH step failed
+function explainError(err, stage) {
+  const m = String(err?.message || err || 'Unknown error'), has = r => r.test(m);
+  const why = has(/B2 is not set up/) ? m
+    : has(/can't read this video/) ? "the browser can't read this video (unusual format or codec). Convert it to MP4 (H.264) and try again."
+    : has(/Only video files|Only video/) ? 'only MP4, MOV, WebM, M4V or MKV files can be uploaded.'
+    : has(/over \d+ MB|too large|Payload too large|maximum allowed size|\(413\)/i) ? `the file is too large (max ${useB2() ? 500 : 50} MB).`
+    : has(/quota|storage.*(full|limit)|exceeded/i) ? 'storage is full. Ask the owner to free space (Dashboard → Clean up unused files) or upgrade the plan.'
+    : has(/\(403\)/) ? 'video storage refused the upload (403). The B2 key or CORS settings are wrong — ask the owner to check the Supabase secrets.'
+    : has(/\(5\d\d\)/) ? 'the storage server had a problem. Wait a minute and retry.'
+    : has(/JWT|expired|not signed in|401|invalid claim/i) ? 'your login has expired. Log in again, then retry.'
+    : has(/row-level security|permission denied|Not allowed|violates row/i) ? "you don't have permission to do this."
+    : has(/For Both|category/i) && has(/only|allowed/) ? m
+    : has(/Failed to fetch|NetworkError|network|connection|Load failed|timed? ?out/i) ? 'no connection to the server. Check your internet and retry.'
+    : has(/duplicate key|already exists/i) ? 'a video with the same file already exists.'
+    : has(/check constraint|invalid input/i) ? 'some details were not accepted (' + m.slice(0, 120) + ').'
+    : m.replace(/^video: |^thumbnail: /, '');
+  return `${stage} failed: ${/^[A-Z][a-z]/.test(why) ? why.charAt(0).toLowerCase() + why.slice(1) : why}`;
+}
 
 // ---------------- BULK UPLOAD ----------------
 // Many files (or a whole folder) at once. Per file: read metadata + thumbnail → fingerprint (skip/variant duplicates)
 // → AI description & tags from the title → upload video + thumbnail → save. Two files at a time; errors don't stop the rest.
 const VIDEO_EXT = /\.(mp4|mov|webm|m4v|mkv)$/i;
-const titleFromName = n => n.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase()).slice(0, 120) || 'Untitled video';
 let bq = [], bRunning = false, bStop = false;
 const bRow = it => { const col = { waiting: 'text-on-surface-variant', done: 'text-green-700', skipped: 'text-on-surface-variant', failed: 'text-error' }[it.state] || 'text-primary';
-  return `<li data-b="${it.id}" class="px-3 py-2.5 flex items-center gap-3 text-sm">
-    <span class="material-symbols-outlined !text-xl ${col}">${{ done: 'check_circle', failed: 'error', skipped: 'block', waiting: 'movie' }[it.state] || 'progress_activity'}</span>
-    <div class="flex-1 min-w-0"><p class="font-medium truncate">${esc(it.saved || titleFromName(it.file.name))}</p>
-      <p class="text-xs ${col} truncate">${esc(it.path || it.file.name)} · ${mb(it.file.size)}${it.msg ? ' · ' + esc(it.msg) : ''}</p>
+  const editable = !bRunning && (it.state === 'waiting' || it.state === 'failed'), weak = !String(it.title || '').trim();
+  return `<li data-b="${it.id}" class="px-3 py-2.5 flex items-start gap-3 text-sm ${weak && editable ? 'bg-amber-50' : ''}">
+    <span class="material-symbols-outlined !text-xl mt-1 ${col}">${{ done: 'check_circle', failed: 'error', skipped: 'block', waiting: 'movie' }[it.state] || 'progress_activity'}</span>
+    <div class="flex-1 min-w-0">${editable ? `<input data-bt="${it.id}" value="${esc(it.title || '')}" placeholder="Type a title — the file name has no words" aria-label="Title for ${esc(it.file.name)}" class="w-full rounded-md border-outline-variant text-sm py-1 px-2 focus:ring-primary ${weak ? 'border-amber-400' : ''}">`
+      : `<p class="font-medium truncate">${esc(it.saved || it.title || it.file.name)}</p>`}
+      <p class="text-xs mt-0.5 ${it.state === 'failed' ? 'text-error' : col} ${it.state === 'failed' ? '' : 'truncate'}">${esc(it.path || it.file.name)} · ${mb(it.file.size)}${it.cat ? ` · ${esc(cname(it.cat))} › ${esc(cname(it.sub))}` : ''}${it.msg ? ' · ' + esc(it.msg) : weak && editable ? ' · no title: will be saved as draft without AI text' : ''}</p>
       ${it.state === 'working' ? `<div class="h-1 mt-1 rounded-full bg-surface-container overflow-hidden"><div class="h-full bg-primary" style="width:${Math.round((it.pc || 0) * 100)}%"></div></div>` : ''}</div>
-    ${!bRunning && it.state === 'waiting' ? `<button data-brm="${it.id}" class="material-symbols-outlined !text-lg text-on-surface-variant hover:text-error" aria-label="Remove">close</button>` : ''}</li>`; };
+    ${!bRunning && it.state === 'waiting' ? `<button data-brm="${it.id}" class="material-symbols-outlined !text-lg text-on-surface-variant hover:text-error mt-1" aria-label="Remove">close</button>` : ''}</li>`; };
 function bPaint(one) {
   if (one) { const li = $(`#blist [data-b="${one.id}"]`); if (li) { li.outerHTML = bRow(one); } }
   else $('#blist').innerHTML = bq.map(bRow).join('');
   const n = k => bq.filter(x => x.state === k).length, done = n('done') + n('skipped') + n('failed');
   $('#bsum').textContent = !bq.length ? 'No videos chosen' : bRunning ? `Uploading… ${done} of ${bq.length} finished` :
-    done ? `${n('done')} uploaded · ${n('skipped')} skipped · ${n('failed')} failed${n('waiting') ? ` · ${n('waiting')} waiting` : ''}` : `${bq.length} video${bq.length === 1 ? '' : 's'} ready (${mb(bq.reduce((a, x) => a + x.file.size, 0))})`;
+    done ? `${n('done')} uploaded · ${n('skipped')} skipped · ${n('failed')} failed${n('waiting') ? ` · ${n('waiting')} waiting` : ''}` : `${bq.length} video${bq.length === 1 ? '' : 's'} ready (${mb(bq.reduce((a, x) => a + x.file.size, 0))})${bq.filter(x => !String(x.title || '').trim()).length ? ` · ${bq.filter(x => !String(x.title || '').trim()).length} need a title` : ''}`;
   $('#bbar').classList.toggle('hidden', !bRunning && !done); $('#bbar > div').style.width = (bq.length ? done / bq.length * 100 : 0) + '%';
   $('#bstart').disabled = bRunning || !n('waiting'); $('#bstart').textContent = done && n('waiting') ? 'Upload remaining' : 'Upload';
   $('#bstop').classList.toggle('hidden', !bRunning); $('#bretry').classList.toggle('hidden', bRunning || !n('failed'));
-  $('#bclear').classList.toggle('hidden', bRunning || !bq.length); $$('#bSetup select, #bSetup input').forEach(x => x.disabled = bRunning || (x.id === 'bsub' && !$('#bcat').value));
+  $('#bclear').classList.toggle('hidden', bRunning || !bq.length); $$('#bSetup select, #bSetup input').forEach(x => x.disabled = bRunning || (x.id === 'bsub' && (!$('#bcat').value || $('#bcat').value === 'auto')));
 }
 function bAdd(files) {
   let skipped = 0; const have = new Set(bq.map(x => x.file.name + '|' + x.file.size));
   for (const f of files) { if (!VIDEO_EXT.test(f.name) && !/^video\//.test(f.type)) { skipped++; continue; } const k = f.name + '|' + f.size; if (have.has(k)) continue; have.add(k);
-    bq.push({ id: Math.random().toString(36).slice(2, 9), file: f, path: f.webkitRelativePath || f._path || '', state: 'waiting' }); }
+    const ct = cleanTitle(f.name); bq.push({ id: Math.random().toString(36).slice(2, 9), file: f, path: f.webkitRelativePath || f._path || '', state: 'waiting', title: ct.title, weak: ct.weak }); }
   bq.sort((a, b) => a.state !== 'waiting' || b.state !== 'waiting' ? 0 : (a.path || a.file.name).localeCompare(b.path || b.file.name, undefined, { numeric: true }));
   if (skipped) toast(`${skipped} non-video file(s) ignored`); bPaint();
 }
@@ -685,41 +734,67 @@ function analyzeFile(file) {                                                    
     };
   });
 }
-async function aiFor(title) {                                                   // same server function as the single form
-  for (let i = 0; i < 2; i++) { try { const { data, error } = await sb.functions.invoke('ai-describe', { body: { title } }); if (!error && data && !data.error) return data; } catch { } }
+async function aiFor(title, withCats) {                                         // same server function as the single form
+  const body = withCats ? { title, categories: catTree() } : { title };
+  for (let i = 0; i < 2; i++) { try { const { data, error } = await sb.functions.invoke('ai-describe', { body }); if (!error && data && !data.error) return data; } catch { } }
   return null;
 }
 async function bOne(it, opts, seen) {
   const set = (msg, pc) => { it.msg = msg; if (pc !== undefined) it.pc = pc; bPaint(it); };
-  it.state = 'working'; set('Reading video…', 0.02);
-  const max = (useB2() ? 500 : 50) * 1024 * 1024; if (it.file.size > max) throw new Error(`over ${useB2() ? 500 : 50} MB`);
-  const meta = await analyzeFile(it.file);
-  set('Checking for duplicates…', 0.05); const hash = await fingerprint(it.file).catch(() => null);
-  if (hash) {
-    if (seen.has(hash)) { if (opts.skip) { it.state = 'skipped'; return set('same file twice in this batch'); } }
-    seen.add(hash);
-    const { data: hit } = await sb.from('videos').select('id,title').eq('file_hash', hash).limit(1);
-    if (hit?.length && opts.skip) { it.state = 'skipped'; return set(`already in library as “${hit[0].title}”`); }
+  let stage = 'Reading the video';
+  try {
+    it.state = 'working'; it.cat = it.sub = ''; set('Reading video…', 0.02);
+    const ext = (it.file.name.match(/\.(\w+)$/) || [])[1] || '';
+    if (!VIDEO_EXT.test(it.file.name)) throw new Error(`Only video files — .${ext || '?'} is not supported`);
+    const max = (useB2() ? 500 : 50) * 1024 * 1024; if (it.file.size > max) throw new Error(`over ${useB2() ? 500 : 50} MB (this file is ${mb(it.file.size)})`);
+    if (!it.file.size) throw new Error("can't read this video — the file is empty");
+    const meta = await analyzeFile(it.file);
+    stage = 'Checking for duplicates'; set('Checking for duplicates…', 0.05); const hash = await fingerprint(it.file).catch(() => null);
+    if (hash) {
+      if (seen.has(hash) && opts.skip) { it.state = 'skipped'; return set('same file twice in this batch'); }
+      seen.add(hash);
+      const { data: hit } = await sb.from('videos').select('id,title').eq('file_hash', hash).limit(1);
+      if (hit?.length && opts.skip) { it.state = 'skipped'; return set(`already in library as “${hit[0].title}”`); }
+    }
+    const typed = String(it.title || '').trim(), title = typed || `Untitled clip ${(it.file.name.match(/\d{4,}/) || [''])[0]}`.trim(), weak = !typed;
+    const auto = opts.cat === 'auto';
+    stage = 'Writing description & tags'; set(weak ? 'No title — skipping AI text' : auto ? 'Writing description, tags & choosing category…' : 'Writing description & tags…', 0.08);
+    const ai = weak ? null : await aiFor(title, auto);
+    let cat = opts.cat, sub = opts.sub;
+    if (auto) {
+      stage = 'Choosing the category';
+      const txt = [title, ...(ai?.tags || [])].join(' ');                   // title + tags only (descriptions are too generic to trust)
+      if (ai?.category && subsOf(ai.category).length) { cat = ai.category; sub = subsOf(cat).some(x => x.slug === ai.subcategory) ? ai.subcategory : (guessCategory(txt, cat)?.sub || subsOf(cat)[0].slug); }
+      else { const g = guessCategory(txt); if (!g) throw new Error(weak ? 'NOCAT_WEAK' : 'NOCAT'); cat = g.cat; sub = g.sub; }
+      it.cat = cat; it.sub = sub;
+    }
+    stage = 'Uploading the video'; set('Uploading video…', 0.1);
+    const video_url = await upload(it.file, it.file.name, 'video', pc => set(`Uploading video… ${Math.round(pc * 100)}%`, 0.1 + pc * 0.8));
+    stage = 'Uploading the thumbnail'; set('Uploading thumbnail…', 0.92); const thumbnail_url = meta.thumb ? await upload(meta.thumb, 'thumb.jpg', 'thumbnail', () => { }) : null;
+    const row = { title, description: ai?.description || '', tags: ai?.tags || [], category: cat, subcategory: sub, duration_seconds: meta.duration_seconds, resolution: meta.resolution, fps: meta.fps || 30, orientation: meta.orientation, file_hash: hash, video_url, thumbnail_url };
+    if (isSuper()) { row.status = 'approved'; row.published = opts.mode === 'approve' && !weak; } else row.published = true;
+    stage = 'Saving the video details'; set('Saving…', 0.97);
+    const { data: saved, error } = await sb.from('videos').insert(row).select('title').maybeSingle();
+    if (error) { if (isSuper()) cleanStorage(); throw new Error(error.message); }
+    it.saved = saved?.title || title; it.state = 'done'; it.pc = 1;
+    set([saved && saved.title !== title ? (/Variant \d+$/.test(saved.title) ? 'saved as a variant' : 'title was taken — renamed') : '',
+      weak ? 'no title — saved as draft, add a title & description later' : ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ')
+      || (isSuper() ? (opts.mode === 'approve' ? 'live' : 'draft') : 'sent for review'));
+  } catch (e) {
+    it.state = 'failed';
+    const m = String(e?.message || e);
+    it.msg = m === 'NOCAT' ? "Couldn't choose a category from the title. Pick a category for this batch, or make the title more descriptive, then Retry."
+      : m === 'NOCAT_WEAK' ? 'No title, so no category could be chosen. Type a title (or pick a category for the batch), then Retry.'
+      : explainError(e, stage);
+    bPaint(it);
   }
-  const title = titleFromName(it.file.name);
-  set('Writing description & tags…', 0.08); const ai = await aiFor(title);
-  set('Uploading video…', 0.1);
-  const video_url = await upload(it.file, it.file.name, 'video', pc => set(`Uploading video… ${Math.round(pc * 100)}%`, 0.1 + pc * 0.8));
-  set('Uploading thumbnail…', 0.92); const thumbnail_url = meta.thumb ? await upload(meta.thumb, 'thumb.jpg', 'thumbnail', () => { }) : null;
-  const row = { title, description: ai?.description || '', tags: ai?.tags || [], category: opts.cat, subcategory: opts.sub, duration_seconds: meta.duration_seconds, resolution: meta.resolution, fps: meta.fps || 30, orientation: meta.orientation, file_hash: hash, video_url, thumbnail_url };
-  if (isSuper()) { row.status = 'approved'; row.published = opts.mode === 'approve'; } else row.published = true;
-  set('Saving…', 0.97);
-  const { data: saved, error } = await sb.from('videos').insert(row).select('title').maybeSingle();
-  if (error) { if (isSuper()) cleanStorage(); throw new Error(error.message); }
-  it.saved = saved?.title || title; it.state = 'done'; it.pc = 1;
-  set([saved && saved.title !== title ? (/Variant \d+$/.test(saved.title) ? 'saved as a variant' : 'title was taken — renamed') : '', ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ') || (isSuper() ? (opts.mode === 'approve' ? 'live' : 'draft') : 'sent for review'));
 }
 async function bRun() {
   const opts = { cat: $('#bcat').value, sub: $('#bsub').value, mode: $('#bpub').value, skip: $('#bskip').checked };
-  if (!opts.cat || !opts.sub) return toast('Choose a category and subcategory first', 1);
+  if (!opts.cat || (opts.cat !== 'auto' && !opts.sub)) return toast('Choose a category (or Auto) and a subcategory first', 1);
   bRunning = true; bStop = false; $('#bstop').textContent = 'Stop'; bPaint(); const seen = new Set();
   const next = () => bq.find(x => x.state === 'waiting');
-  const worker = async () => { let it; while (!bStop && (it = next())) { it.state = 'working'; try { await bOne(it, opts, seen); } catch (e) { it.state = 'failed'; it.msg = e.message; bPaint(it); } } };
+  const worker = async () => { let it; while (!bStop && (it = next())) { it.state = 'working'; await bOne(it, opts, seen); } };
   await Promise.all([worker(), worker()]);
   bRunning = false; bPaint(); loadAll();
   const n = k => bq.filter(x => x.state === k).length;
@@ -727,12 +802,13 @@ async function bRun() {
 }
 function openBulk() {
   if (bRunning) return $('#bmodal').classList.remove('hidden');
-  bq = []; $('#bcat').innerHTML = '<option value="">Select category</option>' + mains().map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join('');
+  bq = []; $('#bcat').innerHTML = '<option value="">Select category</option><option value="auto">✨ Auto — pick for each video</option>' + mains().map(m => `<option value="${esc(m.slug)}">${esc(m.name)}</option>`).join('');
   $('#bsub').innerHTML = '<option value="">Select subcategory</option>'; $('#bpubWrap').classList.toggle('hidden', !isSuper()); $('#bnote').classList.toggle('hidden', isSuper());
   $('#bfiles').value = ''; $('#bfolder').value = ''; bPaint(); $('#bmodal').classList.remove('hidden');
 }
 $('#bulkVideo').onclick = openBulk;
-$('#bcat').onchange = () => { const c = $('#bcat').value; $('#bsub').innerHTML = '<option value="">Select subcategory</option>' + subsOf(c).map(x => `<option value="${esc(x.slug)}">${esc(x.name)}</option>`).join(''); bPaint(); };
+$('#bcat').onchange = () => { const c = $('#bcat').value; $('#bsub').innerHTML = c === 'auto' ? '<option value="auto">Auto</option>' : '<option value="">Select subcategory</option>' + subsOf(c).map(x => `<option value="${esc(x.slug)}">${esc(x.name)}</option>`).join(''); $('#bautoHint').classList.toggle('hidden', c !== 'auto'); bPaint(); };
+$('#blist').addEventListener('input', e => { const id = e.target.dataset.bt; if (!id) return; const it = bq.find(x => x.id === id); if (it) { it.title = e.target.value; it.weak = !e.target.value.trim(); e.target.classList.toggle('border-amber-400', it.weak); const n = bq.filter(x => !String(x.title || '').trim()).length; $('#bsum').textContent = `${bq.length} video${bq.length === 1 ? '' : 's'} ready (${mb(bq.reduce((a, x) => a + x.file.size, 0))})${n ? ` · ${n} need a title` : ''}`; } });
 $('#bfiles').onchange = e => { bAdd([...e.target.files]); e.target.value = ''; };
 $('#bfolder').onchange = e => { bAdd([...e.target.files]); e.target.value = ''; };
 $('#bdrop').ondragover = e => { e.preventDefault(); $('#bdrop').classList.add('border-primary', 'bg-primary-fixed/30'); };

@@ -15,6 +15,8 @@ Return ONLY JSON: {"description": string, "tags": string[]}.
 - description: 1–2 plain sentences, EXACTLY 20 to 25 words in total, describing what is visible in the clip. No hype, no emojis, no quotes.
 - tags: 6–10 lowercase search keywords (1–2 words each), most useful first, no duplicates, no '#'.
 Base everything on the title only. Do not invent brand names or people's names.`;
+const SYSTEM_CATS = SYSTEM.replace('{"description": string, "tags": string[]}', '{"description": string, "tags": string[], "category": string, "subcategory": string}')
+  + `\n- category / subcategory: pick the best-fitting slugs from the list given by the user (copy them exactly). If nothing fits, use "".`;
 
 // Description must be 20–25 words
 export const MIN_W = 20, MAX_W = 25;
@@ -36,9 +38,25 @@ export function fitWords(s: unknown): string {
   return out;
 }
 
-async function groq(model: string, content: string) {
+// ---- category list sent by the site (validated; the AI may only return slugs from it) ----
+type Cat = { slug: string; name: string; subs: { slug: string; name: string }[] };
+const slugOk = (x: unknown) => typeof x === "string" && /^[a-z0-9-]{1,60}$/.test(x);
+export function cleanCats(v: unknown): Cat[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 20).filter((c: any) => slugOk(c?.slug)).map((c: any) => ({ slug: c.slug, name: String(c.name || c.slug).slice(0, 60),
+    subs: (Array.isArray(c.subs) ? c.subs : []).slice(0, 40).filter((s: any) => slugOk(s?.slug)).map((s: any) => ({ slug: s.slug, name: String(s.name || s.slug).slice(0, 60) })) }));
+}
+export function pickCategory(cats: Cat[], c: unknown, s: unknown): { category?: string; subcategory?: string } {
+  if (!cats.length) return {};
+  const cat = cats.find(x => x.slug === String(c || "").trim().toLowerCase());
+  if (!cat) return { category: "", subcategory: "" };
+  const sub = cat.subs.find(x => x.slug === String(s || "").trim().toLowerCase());
+  return { category: cat.slug, subcategory: sub ? sub.slug : "" };
+}
+
+async function groq(model: string, content: string, system = SYSTEM) {
   const body: Record<string, unknown> = { model, temperature: 0.3, max_tokens: 900, response_format: { type: "json_object" },
-    messages: [{ role: "system", content: SYSTEM }, { role: "user", content }] };
+    messages: [{ role: "system", content: system }, { role: "user", content }] };
   if (model.startsWith("openai/gpt-oss")) body.reasoning_effort = "low";
   const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST", headers: { Authorization: `Bearer ${Deno.env.get("GROQ_API_KEY")}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -54,9 +72,9 @@ async function availableModels(): Promise<string[]> {
   return (j.data || []).filter((x: any) => x.active !== false).map((x: any) => String(x.id))
     .filter((id: string) => !/whisper|tts|guard|embed|vision|playai|orpheus|compound|allam/i.test(id));
 }
-async function describe(content: string) {
+async function describe(content: string, system = SYSTEM) {
   const tried: string[] = []; let lastErr = "";
-  const attempt = async (m: string) => { tried.push(m); const out = await groq(m, content); workingModel = m; return { out, used: m }; };
+  const attempt = async (m: string) => { tried.push(m); const out = await groq(m, content, system); workingModel = m; return { out, used: m }; };
   for (const m of [workingModel, ...PREFERRED].filter((x, i, a) => x && a.indexOf(x) === i) as string[]) {
     try { return await attempt(m); } catch (e) { lastErr = (e as Error).message; if (!gone(lastErr) && !/json/i.test(lastErr)) throw e; }
   }
@@ -75,18 +93,23 @@ Deno.serve(async (req) => {
     const { data: ok } = await caller.rpc("is_admin");
     if (!ok) return json({ error: "Not allowed" }, 403);
 
-    const { title = "" } = await req.json();
+    const { title = "", categories } = await req.json();
     const t = String(title).replace(/\s+/g, " ").trim().slice(0, 200);
     if (!t) return json({ error: "Title is empty" }, 400);
-    let { out, used } = await describe(`Title: ${t}`);
+    // Optional (bulk upload "Auto" category): the site's own category list; the AI must pick from it
+    const cats = cleanCats(categories);
+    const extra = cats.length ? `\nCategories (slug: name → subcategory slugs: names):\n` + cats.map(c => `${c.slug}: ${c.name} → ${c.subs.map(s => `${s.slug}: ${s.name}`).join("; ")}`).join("\n") : "";
+    const sys = cats.length ? SYSTEM_CATS : SYSTEM;
+    let { out, used } = await describe(`Title: ${t}${extra}`, sys);
     let words = countWords(out.description);
     if (words < MIN_W || words > MAX_W) {                  // one retry with explicit feedback
-      try { const r = await describe(`Title: ${t}\nYour last description had ${words} words. Rewrite it with between ${MIN_W} and ${MAX_W} words.`); if (Math.abs(countWords(r.out.description) - 22) < Math.abs(words - 22)) ({ out, used } = r); } catch { /* keep first */ }
+      try { const r = await describe(`Title: ${t}${extra}\nYour last description had ${words} words. Rewrite it with between ${MIN_W} and ${MAX_W} words.`, sys); if (Math.abs(countWords(r.out.description) - 22) < Math.abs(words - 22)) ({ out, used } = r); } catch { /* keep first */ }
     }
+    const pick = pickCategory(cats, out.category, out.subcategory);
     const description = fitWords(out.description);
     const tags = [...new Set((Array.isArray(out.tags) ? out.tags : String(out.tags || "").split(","))
       .map((x: unknown) => String(x).toLowerCase().replace(/^#/, "").replace(/[^\p{L}\p{N}\s-]/gu, "").trim()).filter((x: string) => x && x.length <= 30))].slice(0, 10);
-    return json({ description, tags, model: used });
+    return json({ description, tags, model: used, ...pick });
   } catch (err) {
     return json({ error: String((err as Error)?.message ?? err) }, 500);
   }
