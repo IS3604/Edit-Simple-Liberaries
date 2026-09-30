@@ -176,8 +176,15 @@ function renderDash() {
     ? (pend ? `<div class="rounded-xl bg-primary-fixed text-on-primary-fixed p-4 flex items-center gap-3"><span class="material-symbols-outlined">notifications_active</span><p class="flex-1 text-sm"><b>${pend}</b> video(s) waiting for your approval.</p><button data-go2 class="text-sm font-semibold underline">Show them</button></div>` : '')
     : `<div class="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant flex gap-3"><span class="material-symbols-outlined text-primary">info</span>You're an <b>&nbsp;admin&nbsp;</b>: upload videos with “Add video” — they go live only after a superadmin approves them.</div>`;
   $('[data-go2]')?.addEventListener('click', () => tab('videos:pending'));
-  $('#bySub').innerHTML = mains().map(m => `<div class="bg-white rounded-xl border border-outline-variant/40 p-5"><p class="font-semibold mb-3">${esc(m.name)} <span class="text-on-surface-variant font-normal">(${videos.filter(v => isLive(v) && v.category === m.slug).length})</span></p>
-    ${subsOf(m.slug).map(s => { const n = videos.filter(v => isLive(v) && v.subcategory === s.slug).length; return `<div class="flex justify-between text-sm py-1"><span>${esc(s.name)}</span><span class="${n ? '' : 'text-error font-medium'}">${n}</span></div>`; }).join('')}</div>`).join('') || '<p class="text-on-surface-variant">No categories yet.</p>';
+  $('#bySub').innerHTML = mains().map(m => {
+    const live = videos.filter(v => isLive(v) && v.category === m.slug), subs = subsOf(m.slug), known = new Set(subs.map(s => s.slug));
+    const rows = subs.map(s => [s.name, live.filter(v => v.subcategory === s.slug).length]), none = live.filter(v => !known.has(v.subcategory)).length;
+    const used = rows.filter(r => r[1]).sort((a, b) => b[1] - a[1]), empty = rows.filter(r => !r[1]);
+    const row = ([nm, n]) => `<div class="flex justify-between gap-3 text-sm py-1"><span class="truncate">${esc(nm)}</span><span class="${n ? 'font-medium' : 'text-error font-medium'}">${n}</span></div>`;
+    return `<div class="bg-white rounded-xl border border-outline-variant/40 p-5"><div class="flex items-baseline justify-between gap-3 mb-3"><p class="font-semibold">${esc(m.name)}</p><p class="text-sm text-on-surface-variant whitespace-nowrap"><b class="text-on-surface">${live.length}</b> live video${live.length === 1 ? '' : 's'} · ${subs.length} subcategor${subs.length === 1 ? 'y' : 'ies'}</p></div>
+    ${used.map(row).join('') || '<p class="text-sm text-on-surface-variant">No live videos yet.</p>'}${none ? row(['No subcategory', none]) : ''}
+    ${empty.length ? `<details class="mt-2"><summary class="text-sm text-error cursor-pointer">${empty.length} subcategor${empty.length === 1 ? 'y has' : 'ies have'} no videos</summary><div class="mt-1">${empty.map(row).join('')}</div></details>` : ''}</div>`;
+  }).join('') || '<p class="text-on-surface-variant">No categories yet.</p>';
   badge(isSuper() ? 'videos' : 'requests', isSuper() ? pend : videos.filter(v => v.submitted_by === me.id && v.status === 'pending').length);
 }
 
