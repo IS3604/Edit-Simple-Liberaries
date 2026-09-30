@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" data-build="2026-10-01d"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin | Edit Simple Libraries</title><meta name="description" content="Admin panel"><meta name="theme-color" content="#f07f2e">
+<link rel="icon" href="logo.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://ddiwrhpaankvxnbjbbxl.supabase.co" crossorigin><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,400,0..1&display=block">
+<link rel="stylesheet" href="css/site.css?v=20261001d"><meta name="robots" content="noindex"></head>
+<body class="bg-surface text-on-surface antialiased min-h-screen">
+<!-- BOOT SKELETON -->
+<div id="boot" class="min-h-screen md:flex"><aside class="md:w-64 bg-white border-r border-outline-variant/40 p-4 hidden md:block"><div class="sk h-10 w-40 mb-8"></div><div class="space-y-3"><div class="sk h-9"></div><div class="sk h-9"></div><div class="sk h-9"></div><div class="sk h-9"></div></div></aside>
+<div class="flex-1 p-8"><div class="sk h-8 w-48 mb-6"></div><div class="grid gap-4 grid-cols-2 lg:grid-cols-4"><div class="sk h-28"></div><div class="sk h-28"></div><div class="sk h-28"></div><div class="sk h-28"></div></div></div></div>
+
+<!-- LOGIN -->
+<div id="login" style="display:none" class="login-bg relative min-h-screen flex items-center justify-center px-4 overflow-hidden">
+<span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+<div class="relative w-full max-w-sm">
+<form id="loginForm" class="login-card bg-white/90 backdrop-blur border border-white rounded-3xl p-8 shadow-2xl">
+<div class="text-center mb-6"><img src="logo.png" width="64" height="64" class="logo-float h-16 w-16 rounded-2xl mx-auto mb-4 shadow-lg" alt=""><h1 class="text-2xl font-bold">Welcome back</h1><p class="text-sm text-on-surface-variant">Sign in to Edit Simple Libraries admin</p></div>
+<div class="stagger"><label class="text-sm font-medium">Email</label>
+<div class="relative mt-1 mb-4"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">mail</span><input name="email" type="email" autocomplete="username" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10"></div></div>
+<div class="stagger"><label class="text-sm font-medium">Password</label>
+<div class="relative mt-1 mb-6"><span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl">lock</span><input name="password" type="password" autocomplete="current-password" required class="w-full rounded-lg border-outline-variant focus:border-primary focus:ring-primary pl-10 pr-10"><button type="button" id="pwEye" class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-xl" aria-label="Show password">visibility</button></div></div>
+<div id="loginCap" class="w-full min-h-[65px] flex justify-center empty:hidden mb-4"></div>
+<div class="stagger"><button id="loginBtn" class="relative w-full bg-primary text-on-primary rounded-xl py-3 font-semibold hover:brightness-95 active:scale-[.98] transition overflow-hidden"><span class="lbl">Log in</span><span class="spin hidden absolute inset-0 grid place-items-center"><span class="spinner"></span></span></button>
+<p id="loginErr" class="text-sm text-error mt-3 text-center min-h-[20px]" role="alert"></p>
+<button type="button" id="forgotBtn" class="block mx-auto text-sm text-primary font-medium hover:underline">Forgot password?</button></div></form>
+<div id="loginOk" class="hidden login-card bg-white/90 backdrop-blur rounded-3xl p-10 shadow-2xl text-center">
+<svg class="check mx-auto" viewBox="0 0 52 52" width="72" height="72"><circle cx="26" cy="26" r="24" fill="none" stroke="#16a34a" stroke-width="3"/><path fill="none" stroke="#16a34a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M15 27l7 7 15-15"/></svg>
+<p class="text-xl font-bold mt-4">Signed in</p><p class="text-sm text-on-surface-variant">Loading your dashboard…</p></div>
+</div></div>
+
+<!-- SET PASSWORD (invite / reset / first login) -->
+<div id="setpw" style="display:none" class="min-h-screen flex items-center justify-center px-4 bg-surface-container-low">
+<form id="setpwForm" class="w-full max-w-sm bg-white border border-outline-variant/50 rounded-2xl p-8 shadow-xl">
+<img src="logo.png" width="56" height="56" class="h-14 w-14 rounded-xl mx-auto mb-4" alt=""><h1 id="setpwTitle" class="text-2xl font-bold text-center mb-1">Create your password</h1><p id="setpwSub" class="text-sm text-center text-on-surface-variant mb-6"></p>
+<label class="text-sm font-medium">Email (your login ID)</label><input id="setpwEmail" disabled class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4 bg-surface-container-low text-on-surface-variant">
+<label class="text-sm font-medium">New password</label><input name="pw" type="password" minlength="8" autocomplete="new-password" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4">
+<label class="text-sm font-medium">Confirm password</label><input name="pw2" type="password" minlength="8" autocomplete="new-password" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-2">
+<p class="text-xs text-on-surface-variant mb-6">At least 8 characters.</p>
+<button class="w-full bg-primary text-on-primary rounded-lg py-3 font-semibold hover:brightness-95">Save password &amp; continue</button><p id="setpwErr" class="text-sm text-error mt-3 text-center"></p></form></div>
+
+<!-- LINK STATUS -->
+<div id="linkmsg" style="display:none" class="min-h-screen flex items-center justify-center px-4 bg-surface-container-low"><div class="w-full max-w-sm bg-white border border-outline-variant/50 rounded-2xl p-8 shadow-xl text-center">
+<img src="logo.png" width="56" height="56" class="h-14 w-14 rounded-xl mx-auto mb-4" alt=""><h1 id="linkTitle" class="text-xl font-bold mb-2"></h1><p id="linkText" class="text-sm text-on-surface-variant mb-6"></p>
+<a href="admin.html" class="inline-block bg-primary text-on-primary rounded-lg px-6 py-3 font-semibold">Go to login</a></div></div>
+
+<!-- APP -->
+<div id="app" style="display:none" class="min-h-screen md:flex">
+<aside class="sticky top-0 z-40 md:w-64 md:shrink-0 bg-white border-b md:border-b-0 md:border-r border-outline-variant/40 md:min-h-screen md:sticky md:top-0 md:h-screen flex md:flex-col">
+<div class="hidden md:flex items-center gap-3 px-5 h-16 bg-primary-fixed text-on-surface border-b border-orange-200"><img src="logo.png" width="36" height="36" class="h-9 w-9 rounded-lg ring-2 ring-white" alt=""><div><p class="font-bold text-sm leading-tight">Edit Simple</p><p class="text-[11px] text-on-surface-variant uppercase tracking-wide">Admin panel</p></div></div>
+<nav id="tabs" class="flex md:flex-col gap-1 p-2 md:p-3 overflow-x-auto flex-1"></nav>
+<div class="hidden md:block p-3 border-t border-outline-variant/40"><div class="px-3 py-2 mb-1"><p id="meEmail" class="text-sm font-medium truncate"></p><span id="meRole" class="inline-block mt-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"></span></div>
+<a href="index.html" target="_blank" rel="noopener" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-surface-container"><span class="material-symbols-outlined">open_in_new</span>View site</a>
+<button id="logout" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-surface-container"><span class="material-symbols-outlined">logout</span>Log out</button></div>
+<button id="logoutM" class="md:hidden p-3" aria-label="Log out"><span class="material-symbols-outlined">logout</span></button></aside>
+<main class="flex-1 p-4 md:p-8 min-w-0">
+
+<section id="t-dash"><h1 class="text-2xl font-bold mb-6">Dashboard</h1><div id="stats" class="grid gap-4 grid-cols-2 lg:grid-cols-4"></div>
+<div id="dashNote" class="mt-6"></div>
+<div id="storageBox" class="hidden mt-6 bg-white rounded-xl border border-outline-variant/40 p-5"></div>
+<h2 class="font-semibold mt-10 mb-3">Live videos per subcategory</h2><div id="bySub" class="grid gap-4 md:grid-cols-2 items-start"></div></section>
+
+<section id="t-videos" class="hidden"><div class="flex flex-wrap items-center justify-between gap-3 mb-6"><h1 class="text-2xl font-bold">Videos</h1>
+<div class="flex flex-wrap gap-2"><button id="selMode" class="hidden border border-outline-variant rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:border-primary hover:text-primary" aria-pressed="false"><span class="material-symbols-outlined">checklist</span><span class="lbl">Select</span></button><button id="bulkVideo" class="border border-primary text-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:bg-primary-fixed/50"><span class="material-symbols-outlined">library_add</span>Bulk upload</button><button id="newVideo" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add video</button></div></div>
+<div class="flex flex-wrap gap-2 mb-4"><input id="vq" type="search" placeholder="Search title, content, tags…" class="rounded-lg border-outline-variant basis-full sm:basis-auto flex-1 min-w-[180px] focus:ring-primary"><select id="vcat" class="flex-1 sm:flex-none min-w-0 rounded-lg border-outline-variant focus:ring-primary"></select>
+<select id="vstat" class="flex-1 sm:flex-none min-w-0 rounded-lg border-outline-variant focus:ring-primary"><option value="">All status</option><option value="live">Live</option><option value="draft">Draft</option><option value="pending">Pending review</option><option value="rejected">Rejected</option><option value="mine">My uploads</option><option value="dup">Duplicates</option></select></div>
+<div id="vbulk" class="hidden sticky top-16 md:top-3 z-30 mb-3 bg-on-surface text-white rounded-xl px-4 py-2.5 shadow-lg flex flex-wrap items-center gap-2 text-sm" role="toolbar" aria-label="Bulk actions">
+<span id="vbCount" class="font-semibold mr-1"></span><button id="vbAll" class="underline underline-offset-2 text-white/80 hover:text-white mr-auto"></button>
+<button data-bulk="approve" data-for="super" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"><span class="material-symbols-outlined !text-base">check_circle</span>Approve</button>
+<button data-bulk="reject" data-for="super" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"><span class="material-symbols-outlined !text-base">cancel</span>Reject</button>
+<button data-bulk="live" data-for="super" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"><span class="material-symbols-outlined !text-base">visibility</span>Make live</button>
+<button data-bulk="draft" data-for="super" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"><span class="material-symbols-outlined !text-base">visibility_off</span>Move to draft</button>
+<button data-bulk="withdraw" data-for="admin" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold"><span class="material-symbols-outlined !text-base">undo</span>Withdraw my uploads</button>
+<button data-bulk="delete" data-for="super" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold"><span class="material-symbols-outlined !text-base">delete</span>Delete</button>
+<button data-bulk="clear" class="p-1.5 rounded-lg hover:bg-white/10 material-symbols-outlined !text-lg" aria-label="Exit select mode" title="Done selecting">close</button></div>
+<div class="overflow-x-auto bg-white rounded-xl border border-outline-variant/40"><table class="mtable w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th id="vSelTh" class="hidden p-3 w-10"><input id="vSelAll" type="checkbox" aria-label="Select all shown videos" class="rounded text-primary focus:ring-primary"></th><th class="p-3">Video</th><th class="p-3">Category</th><th class="p-3">Specs</th><th class="p-3">Status</th><th id="vActTh" class="p-3 text-right">Actions</th></tr></thead><tbody id="vrows"></tbody></table></div>
+<p id="vempty" class="hidden text-center text-on-surface-variant py-12">No videos match.</p></section>
+
+<section id="t-guide" class="hidden"><h1 class="text-2xl font-bold mb-1">Upload guide</h1><p class="text-on-surface-variant mb-6">Everything you need to get your videos approved quickly.</p><div id="guide"></div></section>
+
+<section id="t-requests" class="hidden"><h1 class="text-2xl font-bold mb-1">My requests</h1><p class="text-on-surface-variant mb-6">Your uploads and changes waiting for superadmin approval.</p><div id="myReq" class="space-y-3"></div></section>
+
+<section id="t-usage" class="hidden"><div class="flex flex-wrap items-center justify-between gap-3 mb-6"><div><h1 class="text-2xl font-bold">Usage</h1><p class="text-sm text-on-surface-variant">Video downloads from the website.</p></div>
+<select id="uDays" aria-label="Time range" class="rounded-lg border-outline-variant focus:ring-primary"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option></select></div>
+<div id="uStats" class="grid gap-4 grid-cols-2 lg:grid-cols-4"></div>
+<div class="bg-white rounded-xl border border-outline-variant/40 p-4 sm:p-5 mt-6"><div class="flex items-baseline justify-between mb-3"><h2 class="font-semibold">Downloads per day</h2><button id="uTableBtn" type="button" class="text-xs font-semibold text-primary">Show table</button></div><div id="uChart" class="relative"></div><div id="uTable" class="hidden mt-3 max-h-64 overflow-auto text-sm"></div></div>
+<div class="grid gap-6 lg:grid-cols-2 mt-6"><div class="bg-white rounded-xl border border-outline-variant/40 p-4 sm:p-5"><h2 class="font-semibold mb-3">Most downloaded videos</h2><div id="uTop"></div></div>
+<div class="bg-white rounded-xl border border-outline-variant/40 p-4 sm:p-5"><h2 class="font-semibold mb-3">By category</h2><div id="uCat"></div><div id="uMemberWrap" class="hidden mt-6"><h2 class="font-semibold mb-3">By member</h2><div id="uMember"></div></div></div></div></section>
+<section id="t-cats" class="hidden"><div class="flex flex-wrap items-center justify-between gap-3 mb-2"><h1 class="text-2xl font-bold">Categories</h1>
+<button id="newCat" class="bg-primary text-on-primary rounded-lg px-4 py-2.5 font-semibold flex items-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">add</span>Add category</button></div>
+<p id="catHint" class="text-sm text-on-surface-variant mb-6"></p><div id="catList" class="grid gap-4 md:grid-cols-3"></div></section>
+
+<section id="t-team" class="hidden">
+<div class="mb-6"><h1 class="text-2xl font-bold">Team</h1><p class="text-on-surface-variant">Invite people and manage who can do what.</p></div>
+<div id="teamStats" class="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6"></div>
+<div id="statusWrap" class="hidden mb-8"><div class="flex items-center justify-between mb-3"><h2 class="font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-primary">monitoring</span>Member status</h2><span class="text-xs text-on-surface-variant">Only visible to you</span></div>
+<div class="bg-white rounded-xl border border-outline-variant/40 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Member</th><th class="p-3">Role</th><th class="p-3">Account</th><th class="p-3">Last sign-in</th><th class="p-3 text-right">Uploads</th><th class="p-3 text-right">Live</th><th class="p-3 text-right">Pending</th><th class="p-3 text-right">Rejected</th><th class="p-3">Last upload</th></tr></thead><tbody id="statusRows"></tbody></table></div></div>
+<div id="teamFull" class="hidden"></div>
+<div id="teamGrid" class="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
+<div id="teamLeft"><h2 class="font-semibold mb-3">Members</h2><div id="teamRows" class="grid gap-3 2xl:grid-cols-2"></div>
+<h2 class="font-semibold mt-8 mb-3">Pending invites</h2><div id="inviteRows" class="space-y-2"></div></div>
+<form id="addAdmin" class="bg-white rounded-2xl border border-outline-variant/40 p-5 lg:sticky lg:top-6">
+<div class="flex items-center gap-3 mb-4"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">person_add</span></span><div><p class="font-semibold">Invite a member</p><p class="text-xs text-on-surface-variant">They'll get an email to set a password.</p></div></div>
+<label class="text-sm font-medium">Email</label><input name="email" type="email" required placeholder="name@example.com" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-4">
+<p class="text-sm font-medium mb-2">Role</p>
+<label class="flex gap-3 p-3 rounded-xl border border-outline-variant/60 mb-2 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary-fixed/40"><input type="radio" name="role" value="admin" checked class="mt-1 text-primary focus:ring-primary"><span><span class="block text-sm font-semibold">Admin</span><span class="block text-xs text-on-surface-variant">Uploads videos. Everything needs your approval.</span></span></label>
+<label class="flex gap-3 p-3 rounded-xl border border-outline-variant/60 mb-4 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary-fixed/40"><input type="radio" name="role" value="superadmin" class="mt-1 text-primary focus:ring-primary"><span><span class="block text-sm font-semibold">Superadmin</span><span class="block text-xs text-on-surface-variant">Full control: publish, review, categories, team.</span></span></label>
+<button class="w-full bg-primary text-on-primary rounded-lg py-2.5 font-semibold flex items-center justify-center gap-2 hover:brightness-95"><span class="material-symbols-outlined !text-lg">send</span>Send invite</button></form>
+</div></section>
+</main></div>
+
+<!-- VIDEO MODAL -->
+<div id="bmodal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto p-4">
+<div class="bg-white rounded-2xl w-full max-w-3xl my-8 p-5 sm:p-6 shadow-2xl">
+<div class="flex justify-between items-center mb-1"><h2 class="text-xl font-bold">Bulk upload</h2><button type="button" id="bClose" class="material-symbols-outlined" aria-label="Close">close</button></div>
+<p class="text-sm text-on-surface-variant mb-4">Add many videos at once. Titles come from the file names; description, tags and thumbnail are created automatically for each video.</p>
+<div id="bSetup">
+<div id="bdrop" class="rounded-xl border-2 border-dashed border-outline-variant p-6 text-center transition">
+<span class="material-symbols-outlined !text-4xl text-primary">cloud_upload</span>
+<p class="font-semibold mt-1">Drop videos or a folder here</p>
+<div class="mt-3 flex flex-wrap justify-center gap-2">
+<label class="cursor-pointer bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold">Choose videos<input id="bfiles" type="file" accept="video/*" multiple class="sr-only"></label>
+<label id="bfolderBtn" class="cursor-pointer border border-outline-variant rounded-lg px-4 py-2 text-sm font-semibold hover:border-primary focus-within:ring-2 focus-within:ring-primary">Choose a folder<input id="bfolder" type="file" webkitdirectory directory multiple class="sr-only"></label></div>
+</div>
+<div class="grid gap-3 sm:grid-cols-3 mt-4">
+<div><label class="text-sm font-medium">Category *</label><select id="bcat" class="w-full mt-1 rounded-lg border-outline-variant focus:ring-primary"></select></div>
+<div><label class="text-sm font-medium">Subcategory *</label><select id="bsub" disabled class="w-full mt-1 rounded-lg border-outline-variant focus:ring-primary"></select></div>
+<div id="bpubWrap"><label class="text-sm font-medium">After upload</label><select id="bpub" class="w-full mt-1 rounded-lg border-outline-variant focus:ring-primary"><option value="approve">Live on website</option><option value="draft">Save as draft</option></select></div></div>
+<p id="bautoHint" class="hidden mt-2 text-xs text-on-surface-variant">Auto: the AI picks the category and subcategory for each video from its title (with a keyword match as backup). You can change them later in Videos.</p>
+<label class="flex items-center gap-2 mt-3 text-sm"><input id="bskip" type="checkbox" checked class="rounded text-primary focus:ring-primary">Skip videos that are already in the library</label>
+<p id="bnote" class="hidden mt-3 text-sm bg-amber-50 text-amber-900 rounded-lg px-3 py-2">Your videos will be sent to a superadmin for review.</p></div>
+<div class="flex items-center justify-between mt-5 mb-2"><p id="bsum" class="text-sm font-medium">No videos chosen</p><button id="bclear" type="button" class="text-xs font-semibold text-on-surface-variant hover:text-error">Clear list</button></div>
+<div id="bbar" class="hidden h-1.5 rounded-full bg-surface-container overflow-hidden mb-2"><div class="h-full bg-primary transition-all" style="width:0"></div></div>
+<ul id="blist" class="max-h-[45vh] overflow-y-auto divide-y divide-outline-variant/40 rounded-xl border border-outline-variant/40 empty:hidden"></ul>
+<div class="flex flex-wrap justify-end gap-2 mt-5"><button id="bstop" type="button" class="hidden border border-outline-variant rounded-lg px-4 py-2.5 font-semibold">Stop</button><button id="bretry" type="button" class="hidden border border-outline-variant rounded-lg px-4 py-2.5 font-semibold">Retry failed</button><button id="bstart" type="button" disabled class="bg-primary text-on-primary rounded-lg px-5 py-2.5 font-semibold disabled:opacity-50">Upload</button><button id="bdone" type="button" class="hidden bg-primary text-on-primary rounded-lg px-5 py-2.5 font-semibold flex items-center gap-1.5"><span class="material-symbols-outlined !text-lg">done_all</span>Done</button></div>
+</div></div>
+<div id="vmodal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto p-4">
+<form id="vform" class="bg-white rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl">
+<div class="flex justify-between items-center mb-2"><h2 id="vtitle" class="text-xl font-bold">Add video</h2><button type="button" data-close class="material-symbols-outlined" aria-label="Close">close</button></div>
+<p id="vnote" class="text-sm mb-4 rounded-lg px-3 py-2 bg-primary-fixed text-on-primary-fixed hidden"></p>
+<div class="grid gap-4 sm:grid-cols-2">
+<div id="vdrop" class="sm:col-span-2 rounded-2xl border-2 border-dashed border-outline-variant hover:border-primary/60 transition cursor-pointer">
+<input type="file" name="vfile" accept="video/*" class="sr-only" tabindex="-1">
+<div id="vpick" class="flex flex-col items-center justify-center text-center py-10 px-4"><span class="w-14 h-14 rounded-full bg-primary-fixed text-primary grid place-items-center mb-3"><span class="material-symbols-outlined !text-3xl">cloud_upload</span></span><p class="font-semibold">Drop your video here</p><p class="text-sm text-on-surface-variant">or click to browse</p></div>
+<div id="vchosen" class="hidden p-3"><video id="vprev" class="w-full rounded-xl max-h-64 bg-black" controls muted playsinline></video>
+<div class="flex items-center gap-2 mt-2 text-sm"><span class="material-symbols-outlined text-primary !text-lg">movie</span><span id="vname" class="flex-1 truncate font-medium"></span><span id="vmeta" class="text-xs text-on-surface-variant"></span><button type="button" id="vchange" class="text-primary font-semibold text-sm">Change</button></div></div></div>
+<div><label class="text-sm font-medium">Category *</label><select name="category" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></select></div>
+<div><label class="text-sm font-medium">Subcategory *</label><select name="subcategory" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></select></div>
+<div class="sm:col-span-2"><label class="text-sm font-medium">Title *</label><input name="title" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"><p id="titleHint" class="hidden mt-1 text-xs"></p></div>
+<div class="sm:col-span-2"><div class="flex items-center gap-2"><label class="text-sm font-medium flex-1">Short description</label><span id="aiStat" class="text-xs text-on-surface-variant"></span><button type="button" id="aiBtn" class="text-xs font-semibold text-primary hover:bg-primary-fixed/50 rounded-md px-2 py-1 flex items-center gap-1"><span class="material-symbols-outlined !text-base">auto_awesome</span>Suggest with AI</button></div><textarea name="description" rows="2" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary"></textarea></div>
+<div class="sm:col-span-2"><label class="text-sm font-medium">Tags / keywords (comma separated)</label><input name="tags" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary" placeholder="court, judge, gavel"></div>
+<input type="hidden" name="duration_seconds"><input type="hidden" name="resolution"><input type="hidden" name="fps"><input type="hidden" name="orientation"></div>
+<div id="progress" class="hidden mt-4 text-sm text-on-surface-variant"><div class="h-2 bg-surface-container rounded-full overflow-hidden"><div id="bar" class="h-full bg-primary w-0 transition-all"></div></div><p id="ptext" class="mt-1"></p></div>
+<div id="vbtns" class="flex flex-wrap justify-end gap-2 mt-6"></div></form></div>
+
+<!-- DUPLICATE MODAL -->
+<div id="dupmodal" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
+<div class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl my-8">
+<div class="flex items-start gap-3 mb-4"><span class="w-10 h-10 shrink-0 rounded-full bg-amber-100 text-amber-700 grid place-items-center"><span class="material-symbols-outlined">content_copy</span></span>
+<div><h2 class="text-lg font-bold">This video was added before</h2><p class="text-sm text-on-surface-variant">The same file is already in the library. Click any item to preview it. Continuing saves it as a new variant.</p></div></div>
+<div class="rounded-xl overflow-hidden bg-black aspect-video mb-2"><video id="dupvid" class="w-full h-full object-contain" controls playsinline></video></div>
+<p id="duptitle" class="text-sm font-semibold mb-4 truncate"></p>
+<div id="duplist" class="space-y-2 max-h-64 overflow-y-auto mb-5"></div>
+<div class="flex flex-wrap justify-end gap-2"><button type="button" id="dupCancel" class="px-4 py-2.5 rounded-lg border border-outline-variant">Choose another file</button><button type="button" id="dupGo" class="px-5 py-2.5 rounded-lg bg-primary text-on-primary font-semibold">Continue anyway</button></div></div></div>
+
+<!-- REJECT MODAL -->
+<div id="rjmodal" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+<form id="rjform" class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+<div class="flex items-start gap-3 mb-4"><span class="w-10 h-10 shrink-0 rounded-full bg-red-100 text-red-700 grid place-items-center"><span class="material-symbols-outlined">block</span></span>
+<div class="flex-1 min-w-0"><h2 class="text-lg font-bold">Reject submission</h2><p id="rjwhat" class="text-sm text-on-surface-variant truncate"></p></div>
+<button type="button" data-close class="material-symbols-outlined" aria-label="Close">close</button></div>
+<label class="text-sm font-medium">Quick reasons</label>
+<div id="rjchips" class="flex flex-wrap gap-2 mt-2 mb-4"></div>
+<label class="text-sm font-medium">Message to the uploader *</label>
+<textarea name="note" rows="4" required maxlength="500" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary" placeholder="Explain what needs to change…"></textarea>
+<p class="text-xs text-on-surface-variant mt-1 mb-5">The uploader sees this in “My requests”.</p>
+<div class="flex justify-end gap-2"><button type="button" data-close class="px-4 py-2.5 rounded-lg border border-outline-variant">Cancel</button><button class="px-5 py-2.5 rounded-lg bg-red-700 text-white font-semibold">Reject</button></div></form></div>
+
+<!-- CATEGORY MODAL -->
+<div id="cmodal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+<form id="cform" class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl"><div class="flex justify-between items-center mb-5"><h2 id="ctitle" class="text-xl font-bold">Category</h2><button type="button" data-close class="material-symbols-outlined" aria-label="Close">close</button></div>
+<input type="hidden" name="orig">
+<label class="text-sm font-medium">Name *</label><input name="name" required class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-3">
+<label class="text-sm font-medium">Slug (URL id) *</label><input name="slug" required pattern="[a-z0-9-]+" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-3">
+<label class="text-sm font-medium">Parent</label><select name="parent_slug" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-3"></select>
+<div id="mainOnly"><label class="text-sm font-medium">Icon (<a class="text-primary" target="_blank" rel="noopener" href="https://fonts.google.com/icons">Material icon</a> name)</label><input name="icon" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-3" placeholder="gavel">
+<label class="text-sm font-medium">Description</label><textarea name="blurb" rows="2" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-3"></textarea></div>
+<label class="text-sm font-medium">Sort order</label><input name="sort" type="number" value="0" class="w-full mt-1 rounded-lg border-outline-variant focus:border-primary focus:ring-primary mb-5">
+<div class="flex justify-end gap-2"><button type="button" data-close class="px-4 py-2.5 rounded-lg border border-outline-variant">Cancel</button><button class="px-5 py-2.5 rounded-lg bg-primary text-on-primary font-semibold">Save</button></div></form></div>
+
+<!-- PREVIEW MODAL -->
+<div id="mdrawer" class="hidden fixed inset-0 z-50 bg-black/40 flex justify-end"><aside class="bg-white w-full max-w-md h-full overflow-y-auto p-5 shadow-2xl" role="dialog" aria-label="Member details"><div class="flex justify-end"><button type="button" data-mclose class="material-symbols-outlined" aria-label="Close">close</button></div><div id="mbody"></div></aside></div>
+<div id="pmodal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div class="w-full max-w-3xl"><div class="flex justify-end mb-2"><button data-close class="material-symbols-outlined text-white" aria-label="Close">close</button></div><video id="pvid" controls class="w-full rounded-xl bg-black max-h-[80vh]"></video></div></div>
+
+<script src="js/config.js?v=20261001d"></script><script src="js/maintenance.js?v=20261001d"></script><script src="js/reset-cooldown.js?v=20261001d"></script><script src="js/captcha.js?v=20261001d"></script><script src="js/admin.js?v=20261001d" type="module"></script>
+<script>setTimeout(()=>{const want=document.documentElement.dataset.build;if(window.ES_ADMIN_BUILD!==want&&!document.querySelector('[data-stale]'))document.body.insertAdjacentHTML('afterbegin','<div data-stale role="alert" style="position:fixed;top:0;left:0;right:0;z-index:95;background:#dc2626;color:#fff;font:14px sans-serif;text-align:center;padding:8px 16px">Old files are loaded (admin.js '+(window.ES_ADMIN_BUILD||'old')+', page '+want+'). Re-upload ALL site files (including the js and vendor folders), then press Ctrl+Shift+R.</div>')},6000)</script></body></html>

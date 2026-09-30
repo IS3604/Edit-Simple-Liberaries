@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><script>document.documentElement.classList.add("auth-wait")</script><style>html.auth-wait body>*:not(#es-login){visibility:hidden!important}html.auth-wait body::after{content:"";position:fixed;top:50%;left:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #ffe4cc;border-top-color:#f07f2e;animation:awspin .7s linear infinite}@keyframes awspin{to{transform:rotate(360deg)}}html.auth-wait.login-open body::after{display:none}</style><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Edit Simple Libraries — Stock Videos for Lawyers & Doctors</title><meta name="description" content="Royalty-free stock videos for lawyers, doctors and professional practices."><meta name="theme-color" content="#ffe4cc">
+<link rel="icon" href="logo.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://ddiwrhpaankvxnbjbbxl.supabase.co" crossorigin><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://loremflickr.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,400,0..1&display=block">
+<link rel="stylesheet" href="css/site.css?v=20261001d"></head>
+<body class="bg-surface text-on-surface antialiased min-h-screen">
+<header id="es-header" class="sticky top-0 z-50 w-full bg-primary-fixed border-b border-orange-200"></header>
+<main>
+<section class="border-b border-outline-variant/40 bg-surface-container-lowest">
+<div class="max-w-4xl mx-auto px-4 pt-10 sm:pt-16 md:pt-20 pb-10 sm:pb-14 text-center">
+<h1 class="text-[2.1rem] leading-[1.15] sm:text-5xl md:text-6xl font-bold tracking-tight md:leading-tight">Footage that builds trust<br class="hidden sm:block"> <span class="text-primary">before the first appointment.</span></h1>
+<p class="mt-5 text-base sm:text-lg text-on-surface-variant max-w-2xl mx-auto">Courtrooms, clinics and real client moments — search our curated library and drop the right clip into your website, ads or reels in minutes.</p>
+<form id="hero-search" role="search" class="mt-8 sm:mt-10 flex items-center gap-1.5 sm:gap-2 bg-white p-1.5 sm:p-2 rounded-2xl shadow-lg border border-outline-variant/60 text-left">
+<select name="cat" aria-label="Category" class="hidden sm:block bg-surface-container-low rounded-xl px-4 py-3 text-sm font-medium border-0 focus:ring-primary"><option value="">All categories</option></select>
+<div class="es-sug-host flex-1 min-w-0 flex items-center"><span class="material-symbols-outlined text-on-surface-variant pl-2 sm:hidden">search</span><input name="q" type="search" enterkeyhint="search" aria-label="Search" class="w-full min-w-0 px-2 sm:px-4 py-3 bg-transparent border-0 focus:ring-0 text-[15px] sm:text-base" placeholder="Search clips — e.g. judge, nurse, handshake"></div>
+<button aria-label="Search" class="shrink-0 bg-primary text-on-primary h-11 w-11 sm:h-auto sm:w-auto sm:px-6 sm:py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:brightness-95"><span class="hidden sm:inline">Search</span><span class="material-symbols-outlined !text-xl sm:!text-lg">arrow_forward</span></button></form>
+<div id="hero-cats" class="sm:hidden mt-3 flex justify-center gap-2 flex-wrap" role="radiogroup" aria-label="Category"></div>
+<p class="hidden sm:block mt-3 text-xs text-on-surface-variant">Tip: press <kbd class="px-1.5 py-0.5 rounded border border-outline-variant bg-white font-sans">/</kbd> to search from anywhere</p>
+</div></section>
+<section class="max-w-7xl mx-auto px-4 md:px-6 mt-10 sm:mt-14">
+<div class="flex items-end justify-between gap-4 mb-6 sm:mb-8"><div><h2 class="text-2xl md:text-3xl font-bold">Browse by practice</h2><p class="text-on-surface-variant mt-1">Pick your field, then jump straight to the scene you need.</p></div></div>
+<div id="cats" class="grid grid-cols-2 gap-3 sm:gap-5 md:gap-6"></div></section>
+<section class="max-w-7xl mx-auto px-4 md:px-6 mt-14 sm:mt-20">
+<div class="flex items-end justify-between gap-4 mb-6"><div><h2 class="text-2xl md:text-3xl font-bold">Latest Videos</h2><p class="text-on-surface-variant">Freshly added to the library.</p></div><a href="videos.html" class="text-primary font-semibold text-sm flex items-center shrink-0">View all<span class="material-symbols-outlined">chevron_right</span></a></div>
+<div id="latest" class="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3"></div></section>
+</main>
+<script src="js/config.js?v=20261001d"></script><script src="js/maintenance.js?v=20261001d"></script><script src="js/reset-cooldown.js?v=20261001d"></script><script src="js/captcha.js?v=20261001d"></script><script src="js/data.js?v=20261001d"></script><script src="js/layout.js?v=20261001d"></script>
+<script>
+(()=>{
+const f=document.getElementById('hero-search'),cats=document.getElementById('cats'),latest=document.getElementById('latest');
+latest.innerHTML=esSkel(6);
+const catSkel=`<div class="rounded-2xl sm:rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40"><div class="sk aspect-[4/5] sm:aspect-[16/10] !rounded-none"></div><div class="p-3 sm:p-5"><div class="sk h-3 w-full mb-1"></div><div class="sk h-3 w-2/3"></div></div></div>`;
+const G={lawyers:'from-orange-400 via-amber-500 to-orange-700',doctors:'from-rose-300 via-orange-400 to-amber-600'};
+// Fallback photos (loremflickr) when a category has no video thumbnails yet.
+const KW={lawyers:['lawyer,law','courtroom,judge','gavel,justice','contract,signing'],doctors:['doctor,hospital','surgery,surgeon','nurse,patient','stethoscope,medical']};
+const fallback=c=>(KW[c.slug]||[c.name.replace(/^For /,'').toLowerCase().replace(/[^a-z ]/g,'').trim().replace(/\s+/g,',')]).map(k=>`https://loremflickr.com/640/400/${encodeURIComponent(k).replace(/%2C/g,',')}?lock=${1+Math.floor(Math.random()*9999)}`);
+const slides=imgs=>imgs.map((u,i)=>`<img src="${esEsc(u)}" alt="" ${i?'loading="lazy"':''} decoding="async" referrerpolicy="no-referrer" onerror="esSlideErr(this)" class="es-slide absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i?'opacity-0':'opacity-100'}">`).join('');
+const card=(c,n,imgs)=>`<a href="videos.html?cat=${c.slug}" class="cat-card group/cat flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden bg-surface-container-lowest border border-outline-variant/40 shadow-sm hover:shadow-2xl hover:-translate-y-1 hover:border-primary/40 transition-all duration-300" aria-label="Browse ${esEsc(c.name)}">
+ <span class="cat-media relative block aspect-[4/5] sm:aspect-[16/10] bg-gradient-to-br ${G[c.slug]||G.lawyers} overflow-hidden">
+  <span class="material-symbols-outlined absolute inset-0 m-auto h-fit w-fit text-white/30 !text-[72px] sm:!text-[120px]" aria-hidden="true">${c.icon}</span>
+  <span class="es-show absolute inset-0 group-hover/cat:scale-105 transition-transform duration-700">${slides(imgs)}</span>
+  <span class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent"></span>
+  <span class="absolute top-2 right-2 sm:top-3 sm:right-3 text-[10px] sm:text-[11px] font-bold bg-white/95 text-on-surface px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full shadow">${n} video${n===1?'':'s'}</span>
+  <span class="absolute left-3 right-3 bottom-3 sm:left-4 sm:right-4 sm:bottom-4 flex items-center gap-2 sm:gap-3 text-white"><span class="hidden sm:grid w-11 h-11 shrink-0 rounded-2xl bg-white/20 backdrop-blur place-items-center ring-1 ring-white/40"><span class="material-symbols-outlined">${c.icon}</span></span><span class="text-base sm:text-2xl font-bold font-display leading-tight drop-shadow">${esEsc(c.name)}</span></span></span>
+ <span class="p-3 sm:p-5 flex flex-col flex-1">
+  <span class="hidden sm:block text-sm text-on-surface-variant">${esEsc(c.blurb)}</span>
+  <span class="sm:mt-auto sm:pt-4 inline-flex items-center gap-1 text-xs sm:text-sm font-semibold text-primary">Explore<span class="hidden sm:inline">&nbsp;${esEsc(c.name.replace(/^For /,'').toLowerCase())} footage</span><span class="material-symbols-outlined !text-base sm:!text-lg group-hover/cat:translate-x-1 transition-transform">arrow_forward</span></span></span></a>`;
+window.esSlideErr=im=>{const sh=im.parentNode,was=im.classList.contains('opacity-100');im.remove();if(was)sh?.querySelector('img.es-slide')?.classList.replace('opacity-0','opacity-100')};   // broken image: drop it, show the next one
+// One timer drives every card: cross-fade to the next loaded slide every 3.5s (paused when tab hidden / reduced motion).
+let tick=null;const startShow=()=>{clearInterval(tick);if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ tick=setInterval(()=>{if(document.hidden)return;cats.querySelectorAll('.es-show').forEach(sh=>{const im=[...sh.querySelectorAll('img.es-slide')];if(im.length<2)return;
+  const cur=im.findIndex(x=>x.classList.contains('opacity-100'));const nxt=[...im.keys()].map(k=>(cur+1+k)%im.length).find(k=>k!==cur&&im[k].complete&&im[k].naturalWidth);if(nxt==null)return;
+  im[cur]?.classList.replace('opacity-100','opacity-0');im[nxt].classList.replace('opacity-0','opacity-100')})},3500)};
+cats.innerHTML=catSkel.repeat(2);
+const go=q=>{const p=new URLSearchParams();if(f.cat.value)p.set('cat',f.cat.value);if(q)p.set('q',q);esRemember(q);location.href='videos.html?'+p};
+f.onsubmit=e=>{e.preventDefault();go(f.q.value.trim())};esSuggest(f.q,{onSearch:go,cat:()=>f.cat.value});
+const hc=document.getElementById('hero-cats');const paintHc=()=>{hc.innerHTML=[['','All'],...ES.CATS.map(c=>[c.slug,c.name])].map(([v,n])=>`<button type="button" role="radio" aria-checked="${f.cat.value===v}" data-v="${v}" class="px-3.5 py-1.5 rounded-full text-xs font-semibold border transition ${f.cat.value===v?'bg-primary text-white border-primary':'bg-white border-outline-variant/70 text-on-surface'}">${esEsc(n)}</button>`).join('')};
+hc.onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;f.cat.value=b.dataset.v;paintHc()};f.cat.onchange=paintHc;
+const render=async()=>{
+ {const cur=f.cat.value;f.cat.innerHTML='<option value="">All categories</option>'+ES.CATS.map(c=>`<option value="${c.slug}">${esEsc(c.name)}</option>`).join('');f.cat.value=ES.cat(cur)?cur:'';paintHc()}
+ const [n,vids]=await Promise.all([ES.counts(),ES.listVideos({limit:6})]);
+ const per=await Promise.all(ES.CATS.map(c=>ES.listVideos({category:c.slug,limit:8}).then(l=>l.map(v=>v.thumbnail_url).filter(Boolean)).catch(()=>[])));
+ const sig=JSON.stringify([ES.CATS.map(c=>[c.slug,c.name,c.icon,c.blurb]),n,per.map(l=>l.length)]);
+ if(sig!==cats.dataset.sig){cats.dataset.sig=sig;cats.innerHTML=ES.CATS.map((c,i)=>card(c,n[c.slug]||0,[...per[i],...fallback(c)].slice(0,Math.max(per[i].length,3)))).join('');startShow()}   // re-render only on real change, so slides don't flicker on live updates
+ latest.innerHTML=vids.length?vids.map(esCard).join(''):'<p class="col-span-full text-center text-on-surface-variant py-12">New videos coming soon.</p>';esHoverPlay(latest);
+};
+ES.ready.then(render);ES.onChange(render);
+})();
+</script></body></html>

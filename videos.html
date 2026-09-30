@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><script>document.documentElement.classList.add("auth-wait")</script><style>html.auth-wait body>*:not(#es-login){visibility:hidden!important}html.auth-wait body::after{content:"";position:fixed;top:50%;left:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #ffe4cc;border-top-color:#f07f2e;animation:awspin .7s linear infinite}@keyframes awspin{to{transform:rotate(360deg)}}html.auth-wait.login-open body::after{display:none}</style><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Browse Videos | Edit Simple Libraries</title><meta name="description" content="Browse royalty-free stock videos for lawyers and doctors by category."><meta name="theme-color" content="#ffe4cc">
+<link rel="icon" href="logo.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://ddiwrhpaankvxnbjbbxl.supabase.co" crossorigin><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,400,0..1&display=block">
+<link rel="stylesheet" href="css/site.css?v=20261001d"></head>
+<body class="bg-surface text-on-surface antialiased min-h-screen">
+<header id="es-header" class="sticky top-0 z-50 w-full bg-primary-fixed border-b border-orange-200"></header>
+<main class="max-w-7xl mx-auto px-4 md:px-6 pt-8">
+<nav id="crumbs" aria-label="Breadcrumb" class="text-sm text-on-surface-variant flex flex-wrap items-center gap-1 mb-6 min-h-[20px]"></nav>
+<h1 id="title" class="text-3xl md:text-5xl font-bold tracking-tight">All Videos</h1>
+<p id="blurb" class="mt-3 text-on-surface-variant max-w-2xl">Royalty-free stock videos for lawyers, doctors and professional practices.</p>
+<div id="cattabs" class="mt-6 sm:mt-8 -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:flex-wrap gap-2 min-h-[40px] overflow-x-auto no-scrollbar [&>a]:shrink-0 [&>a]:whitespace-nowrap"></div>
+<div id="subtabs" class="mt-3 -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:flex-wrap gap-2 overflow-x-auto no-scrollbar [&>*]:shrink-0 [&>*]:whitespace-nowrap"></div>
+<div class="mt-6 flex flex-col lg:flex-row gap-3">
+<label class="es-sug-host flex-1 flex items-center gap-2 bg-white border border-outline-variant/70 rounded-xl px-4 focus-within:ring-2 focus-within:ring-primary"><span class="material-symbols-outlined text-on-surface-variant">search</span><input id="q" type="search" enterkeyhint="search" aria-label="Search videos" class="flex-1 min-w-0 py-3 bg-transparent border-0 focus:ring-0" placeholder="Search what's in the video, title or tags…"></label>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 lg:flex lg:gap-3 [&>select]:rounded-xl [&>select]:border-outline-variant/70 [&>select]:bg-white [&>select]:px-3 [&>select]:py-3 [&>select]:text-sm [&>select]:min-w-0 [&>select]:w-full lg:[&>select]:w-auto [&>select]:focus:ring-primary">
+<select id="sort" aria-label="Sort"><option value="rel">Best match</option><option value="new">Newest</option><option value="short">Shortest</option><option value="long">Longest</option><option value="az">A–Z</option></select>
+<select id="res" aria-label="Resolution"><option value="">Any resolution</option><option>4K</option><option>1080p</option><option>720p</option></select>
+<select id="ori" aria-label="Orientation"><option value="">Any orientation</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option><option value="square">Square</option></select>
+<select id="dur" aria-label="Length"><option value="">Any length</option><option value="s">Under 10s</option><option value="m">10–30s</option><option value="l">Over 30s</option></select></div></div>
+<div class="mt-4 flex items-center justify-between gap-3 min-h-[20px]"><p id="count" class="text-sm text-on-surface-variant" aria-live="polite"></p><button id="clear" type="button" class="hidden text-sm font-semibold text-primary hover:underline shrink-0">Clear filters</button></div>
+<div id="grid" class="mt-4 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3"></div>
+<div id="empty" class="hidden text-center py-20 text-on-surface-variant"><span class="material-symbols-outlined !text-5xl">videocam_off</span><p class="mt-2">No videos found. Try different words, fewer filters or another subcategory.</p><p id="didyou" class="mt-3 text-sm"></p></div>
+<div class="text-center mt-10"><button id="more" class="hidden px-6 py-3 rounded-full border border-outline-variant font-semibold hover:border-primary hover:text-primary">Load more</button></div>
+</main>
+<script src="js/config.js?v=20261001d"></script><script src="js/maintenance.js?v=20261001d"></script><script src="js/reset-cooldown.js?v=20261001d"></script><script src="js/captcha.js?v=20261001d"></script><script src="js/data.js?v=20261001d"></script><script src="js/layout.js?v=20261001d"></script>
+<script>
+(()=>{
+const P=new URLSearchParams(location.search);let cat=P.get('cat')||'',sub=P.get('sub')||'',subOpen=false;const qi=document.getElementById('q');qi.value=P.get('q')||'';
+const $=id=>document.getElementById(id),F=['sort','res','ori','dur'];F.forEach(k=>{const v=P.get(k);if(v&&[...$(k).options].some(o=>o.value===v))$(k).value=v});
+const grid=document.getElementById('grid'),PAGE=24;let all=[],shown=PAGE,seq=0;
+const pill=(on,href,t)=>`<a href="${href}" class="px-4 py-2 rounded-full text-sm font-medium border transition ${on?'bg-primary text-on-primary border-primary':'bg-white border-outline-variant/70 hover:border-primary hover:text-primary'}">${esEsc(t)}</a>`;
+function head(){const c=ES.cat(cat);
+ document.getElementById('cattabs').innerHTML=pill(!cat,'videos.html','All')+ES.CATS.map(x=>pill(cat===x.slug,'videos.html?cat='+x.slug,x.name)).join('');
+ // Many subcategories: on PC show the first 9 (+ the selected one) and a "+N more" toggle; phones scroll sideways.
+ const st=$('subtabs'),MAX=9;let extra=0;
+ st.innerHTML=c?pill(!sub,'videos.html?cat='+cat,'All '+c.name.replace(/^For /,''))+c.subs.map(([s,n],i)=>{const hide=i>=MAX&&sub!==s&&!subOpen;if(hide)extra++;return pill(sub===s,`videos.html?cat=${cat}&sub=${s}`,n).replace('<a ',`<a ${hide?'data-extra ':''}`)}).join(''):'';
+ st.querySelectorAll('a').forEach(a=>{a.classList.replace('py-2','py-1.5');a.classList.replace('text-sm','text-xs');if(a.hasAttribute('data-extra'))a.classList.add('sm:hidden')});
+ if(c&&c.subs.length>MAX)st.insertAdjacentHTML('beforeend',`<button type="button" id="submore" aria-expanded="${subOpen}" class="hidden sm:inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-xs font-semibold border border-dashed border-primary/60 text-primary hover:bg-primary-fixed">${subOpen?'Show less':`+${extra} more`}<span class="material-symbols-outlined !text-base">${subOpen?'expand_less':'expand_more'}</span></button>`);
+ const sm=$('submore');if(sm)sm.onclick=()=>{subOpen=!subOpen;head()};
+ const sn=sub&&c?ES.subName(cat,sub):'';document.getElementById('title').textContent=sn||(c?c.name:'All Videos');
+ if(c)document.getElementById('blurb').textContent=c.blurb;document.title=(sn||c?.name||'All Videos')+' | Edit Simple Libraries';
+ document.getElementById('crumbs').innerHTML='<a href="index.html" class="hover:text-primary">Home</a>'+(c?` <span>/</span> <a href="videos.html?cat=${cat}" class="hover:text-primary">${esEsc(c.name)}</a>`:' <span>/</span> Videos')+(sn?` <span>/</span> <span class="text-on-surface">${esEsc(sn)}</span>`:'');}
+async function load(silent){const my=++seq;if(!silent){grid.innerHTML=esSkel(6);document.getElementById('empty').classList.add('hidden');document.getElementById('count').textContent=''}
+ const q=qi.value.trim();const r=await ES.listVideos({category:cat||undefined,subcategory:sub||undefined,q:q||undefined});if(my!==seq)return;all=r;if(!silent)shown=PAGE;render();
+ sync();}
+function sync(){const u=new URL(location),q=qi.value.trim();q?u.searchParams.set('q',q):u.searchParams.delete('q');F.forEach(k=>{const v=$(k).value;v&&v!==(k==='sort'?'rel':'')?u.searchParams.set(k,v):u.searchParams.delete(k)});history.replaceState(null,'',u)}
+const DUR={s:d=>d<10,m:d=>d>=10&&d<=30,l:d=>d>30};
+function render(){const s=$('sort').value,r=$('res').value,o=$('ori').value,d=$('dur').value;
+ let v=all.filter(x=>(!r||x.resolution===r)&&(!o||x.orientation===o)&&(!d||DUR[d](x.duration_seconds||0)));
+ $('clear').classList.toggle('hidden',!(r||o||d||qi.value.trim()||s!=='rel'));
+ const cmp={new:(a,b)=>b.created_at.localeCompare(a.created_at),short:(a,b)=>a.duration_seconds-b.duration_seconds,long:(a,b)=>b.duration_seconds-a.duration_seconds,az:(a,b)=>a.title.localeCompare(b.title)}[s];if(cmp)v=[...v].sort(cmp);
+ grid.innerHTML=v.slice(0,shown).map(esCard).join('');esHoverPlay(grid);
+ document.getElementById('count').textContent=v.length+' video'+(v.length===1?'':'s')+(qi.value.trim()?` for “${qi.value.trim()}”`:'');
+ document.getElementById('empty').classList.toggle('hidden',v.length>0);document.getElementById('more').classList.toggle('hidden',v.length<=shown);
+ // no results: suggest a matching subcategory, or searching everywhere
+ const q=qi.value.trim().toLowerCase(),dy=$('didyou');dy.innerHTML='';if(!v.length&&q){const ws=q.split(/\s+/).filter(Boolean),sc=n=>{n=n.toLowerCase();return(n.includes(q)?100:0)+ws.filter(w=>new RegExp('\\b'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).test(n)).length*10+ws.filter(w=>w.length>2&&n.includes(w)).length};const hit=ES.CATS.flatMap(c=>c.subs.map(([sl,n])=>[c.slug,sl,n,sc(n)])).filter(x=>x[3]>=10||x[3]>=1&&ws.some(w=>w.length>2)).sort((a,b)=>b[3]-a[3])[0];
+  if(hit)dy.innerHTML=`Try the subcategory <a class="text-primary font-semibold underline" href="videos.html?cat=${hit[0]}&sub=${hit[1]}">${esEsc(hit[2])}</a>`;else if(cat)dy.innerHTML=`<a class="text-primary font-semibold underline" href="videos.html?q=${encodeURIComponent(qi.value.trim())}">Search all categories instead</a>`}}
+let t;qi.oninput=()=>{clearTimeout(t);t=setTimeout(load,300)};F.forEach(id=>$(id).onchange=()=>{shown=PAGE;render();sync()});
+esSuggest(qi,{onSearch:q=>{qi.value=q;load()},cat:()=>cat});qi.addEventListener('keydown',e=>{if(e.key==='Enter'){esRemember(qi.value);clearTimeout(t);load()}});
+$('clear').onclick=()=>{qi.value='';$('sort').value='rel';['res','ori','dur'].forEach(k=>$(k).value='');load()};
+document.getElementById('more').onclick=()=>{shown+=PAGE;render()};
+head();grid.innerHTML=esSkel(6);ES.ready.then(()=>{head();load()});ES.onChange(()=>{head();load(true)});
+})();
+</script></body></html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><script>document.documentElement.classList.add("auth-wait")</script><style>html.auth-wait body>*:not(#es-login){visibility:hidden!important}html.auth-wait body::after{content:"";position:fixed;top:50%;left:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #ffe4cc;border-top-color:#f07f2e;animation:awspin .7s linear infinite}@keyframes awspin{to{transform:rotate(360deg)}}html.auth-wait.login-open body::after{display:none}</style><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video | Edit Simple Libraries</title><meta name="description" content="Royalty-free stock video for lawyers and doctors."><meta name="theme-color" content="#ffe4cc">
+<link rel="icon" href="logo.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://ddiwrhpaankvxnbjbbxl.supabase.co" crossorigin><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,400,0..1&display=block">
+<link rel="stylesheet" href="css/site.css?v=20261001d"></head>
+<body class="bg-surface text-on-surface antialiased min-h-screen">
+<header id="es-header" class="sticky top-0 z-50 w-full bg-primary-fixed border-b border-orange-200"></header>
+<main class="max-w-7xl mx-auto px-4 md:px-6 pt-8" id="root">
+<div class="sk h-4 w-64 mb-6"></div><div class="grid lg:grid-cols-12 gap-8"><div class="lg:col-span-8"><div class="sk aspect-video !rounded-2xl"></div><div class="sk h-8 w-2/3 mt-6"></div><div class="sk h-4 w-full mt-4"></div><div class="sk h-4 w-5/6 mt-2"></div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6"><div class="sk h-16"></div><div class="sk h-16"></div><div class="sk h-16"></div><div class="sk h-16"></div></div></div><div class="lg:col-span-4"><div class="sk h-56 !rounded-2xl"></div></div></div></main>
+<script src="js/config.js?v=20261001d"></script><script src="js/maintenance.js?v=20261001d"></script><script src="js/reset-cooldown.js?v=20261001d"></script><script src="js/captcha.js?v=20261001d"></script><script src="js/data.js?v=20261001d"></script><script src="js/layout.js?v=20261001d"></script>
+<script>
+let first=true;const render=async()=>{const id=new URLSearchParams(location.search).get('id');const v=id&&await ES.getVideo(id);const root=document.getElementById('root');
+if(!v){root.innerHTML='<div class="text-center py-24"><h1 class="text-2xl font-bold">Video not found</h1><a href="videos.html" class="text-primary font-semibold mt-4 inline-block">Browse all videos</a></div>';return}
+const e=esEsc,c=ES.cat(v.category),sn=ES.subName(v.category,v.subcategory);document.title=v.title+' | Edit Simple Libraries';
+document.querySelector('meta[name=description]').content=(v.description||v.title).slice(0,155);
+root.innerHTML=`<nav aria-label="Breadcrumb" class="text-sm text-on-surface-variant flex flex-wrap items-center gap-1 mb-6"><a href="index.html" class="hover:text-primary">Home</a> / <a class="hover:text-primary" href="videos.html?cat=${v.category}">${e(c?.name)}</a> / <a class="hover:text-primary" href="videos.html?cat=${v.category}&sub=${v.subcategory}">${e(sn)}</a></nav>
+<div class="grid lg:grid-cols-12 gap-8"><section class="lg:col-span-8">
+<div class="rounded-2xl overflow-hidden bg-black aspect-video relative">${v.video_url?`<video controls controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false" playsinline preload="metadata" poster="${e(v.thumbnail_url||'')}" src="${e(v.video_url)}" class="w-full h-full object-contain"></video>`:`<div class="absolute inset-0 bg-gradient-to-br from-orange-300 to-amber-600 flex flex-col items-center justify-center text-white"><span class="material-symbols-outlined !text-7xl">${c?.icon||'movie'}</span><p class="mt-2 text-sm opacity-90">Preview not available</p></div>`}</div>
+<h1 class="mt-6 text-2xl md:text-4xl font-bold">${e(v.title)}</h1>
+<p class="mt-3 text-on-surface-variant">${e(v.description||'')}</p>
+${v.content?`<div class="mt-5 rounded-xl bg-surface-container-low p-4"><p class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-1">What's in this video</p><p class="text-sm">${e(v.content)}</p></div>`:''}
+<div class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">${[['Resolution',v.resolution||'—'],['Frame rate',(v.fps||'—')+' fps'],['Duration',ES.dur(v.duration_seconds||0)],['Orientation',v.orientation||'horizontal']].map(([k,x])=>`<div class="rounded-xl bg-surface-container-lowest border border-outline-variant/40 p-4"><p class="text-xs text-on-surface-variant">${k}</p><p class="font-semibold capitalize">${e(x)}</p></div>`).join('')}</div>
+<div class="mt-6 flex flex-wrap gap-2">${(v.tags||[]).map(t=>`<a href="videos.html?q=${encodeURIComponent(t)}" class="text-xs px-3 py-1.5 rounded-full bg-surface-container hover:text-primary">#${e(t)}</a>`).join('')}</div></section>
+<aside class="lg:col-span-4"><div class="rounded-2xl bg-surface-container-lowest border border-outline-variant/40 p-6 lg:sticky lg:top-24">
+<p class="text-xs font-semibold text-primary uppercase tracking-wide">${e(c?.name)} · ${e(sn)}</p><h2 class="text-lg font-bold mt-1">Download this clip</h2><p class="text-sm text-on-surface-variant mt-1 mb-5">Royalty-free for your practice's website, ads and social media.</p>
+<button id="dl" class="w-full bg-primary text-on-primary rounded-xl py-3 font-semibold flex items-center justify-center gap-2 hover:brightness-95"><span class="material-symbols-outlined">download</span>Download</button>
+<button id="share" class="w-full mt-3 border border-outline-variant rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:border-primary hover:text-primary"><span class="material-symbols-outlined">share</span>Copy link</button></div></aside></div>
+<section class="mt-16"><h2 class="text-xl font-bold mb-4">More in ${e(sn)}</h2><div id="rel" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">${esSkel(3)}</div></section>`;
+document.getElementById('dl').onclick=async e=>{if(!v.video_url)return esToast('Download not available yet');ES.logDownload(v.id);
+ const b=e.currentTarget,lbl=b.innerHTML,ext=((v._path||v.video_url).split('?')[0].match(/\.(\w{2,4})$/)||[,'mp4'])[1],name=(v.title.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,80)||'video')+'.'+ext;
+ const save=href=>{const a=document.createElement('a');a.href=href;a.download=name;document.body.appendChild(a);a.click();a.remove()};
+ if(v._path||v._b2){const u=await ES.downloadUrl(v,name);if(u){save(u);return esToast('Download started')}}
+ b.disabled=true;b.innerHTML='<span class="material-symbols-outlined animate-spin">progress_activity</span>Preparing…';
+ try{const r=await fetch(v.video_url);if(!r.ok)throw 0;const u=URL.createObjectURL(await r.blob());save(u);setTimeout(()=>URL.revokeObjectURL(u),6e4);esToast('Download started')}
+ catch{esToast('Could not download this file')}b.disabled=false;b.innerHTML=lbl};
+document.getElementById('share').onclick=()=>{navigator.clipboard?.writeText(location.href);esToast('Link copied')};
+let rel=(await ES.listVideos({category:v.category})).filter(x=>x.id!==v.id);rel.sort((a,b)=>(b.subcategory===v.subcategory)-(a.subcategory===v.subcategory));
+const r=document.getElementById('rel');r.innerHTML=rel.slice(0,3).map(esCard).join('')||'<p class="text-on-surface-variant">No related videos yet.</p>';esHoverPlay(r);first=false};
+ES.ready.then(render);ES.onChange(()=>{const vd=document.querySelector('#root video');if(vd&&!vd.paused)return;render()});
+</script></body></html>
