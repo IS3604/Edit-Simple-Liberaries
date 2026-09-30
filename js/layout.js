@@ -39,10 +39,46 @@ ${ES.user?`<a href="admin.html" title="Admin panel" class="hidden sm:flex items-
 function footer(){let f=document.getElementById('es-footer');if(!f){f=document.createElement('footer');f.id='es-footer';f.className='mt-16 sm:mt-24 border-t border-outline-variant/40 bg-surface-container-low';document.body.append(f)}
   if(f.dataset.done)return;f.dataset.done='1';
   f.innerHTML=`<div class="max-w-7xl mx-auto px-4 md:px-6 py-10 flex flex-col items-center text-center gap-3"><div class="flex items-center gap-2"><img src="logo.png" width="32" height="32" class="h-8 w-8 rounded-md" alt=""><span class="font-display font-bold">Edit Simple Libraries</span></div><p class="text-sm text-on-surface-variant max-w-xs">Royalty-free stock videos made for lawyers, doctors and professional practices.</p></div><p class="text-center text-xs text-on-surface-variant pb-8">© ${new Date().getFullYear()} Edit Simple Libraries. All rights reserved.</p>`}
+// ---- Search suggestions (used by hero search, videos page and the header search) ----
+// Shows: recent searches · matching categories/subcategories (jump straight there) · matching videos · popular ideas.
+const RKEY='es_recent_q';
+const recent=()=>{try{return JSON.parse(localStorage.getItem(RKEY)||'[]').filter(x=>typeof x==='string').slice(0,5)}catch{return[]}};
+window.esRemember=q=>{q=String(q||'').trim();if(q.length<2)return;try{localStorage.setItem(RKEY,JSON.stringify([q,...recent().filter(x=>x.toLowerCase()!==q.toLowerCase())].slice(0,5)))}catch{}};
+const IDEAS=['doctor talking to patient','courtroom','gavel','handshake','hospital hallway','signing contract'];
+window.esSuggest=(input,{onSearch,cat}={})=>{
+  if(!input||input.dataset.sug)return;input.dataset.sug='1';input.setAttribute('autocomplete','off');input.setAttribute('role','combobox');input.setAttribute('aria-expanded','false');
+  const box=document.createElement('div');box.className='es-sug hidden absolute left-0 right-0 top-full mt-1 z-[65] bg-white rounded-xl shadow-2xl border border-outline-variant/50 overflow-hidden text-left text-sm max-h-[60vh] overflow-y-auto';box.setAttribute('role','listbox');
+  const host=input.closest('.es-sug-host')||input.parentElement;host.classList.add('relative');host.appendChild(box);
+  let items=[],act=-1,seq=0,t;
+  const hl=(txt,q)=>{const e=esc(txt);const w=q.trim().toLowerCase().split(/\s+/).filter(x=>x.length>1);if(!w.length)return e;return e.replace(new RegExp('('+w.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','gi'),'<b class="text-on-surface">$1</b>')};
+  const row=(it,i)=>`<a href="${it.href||'#'}" data-i="${i}" role="option" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container ${i===act?'bg-surface-container':''}"><span class="material-symbols-outlined !text-[20px] text-on-surface-variant">${it.icon}</span><span class="flex-1 min-w-0 truncate text-on-surface-variant">${it.html}</span>${it.tag?`<span class="text-[11px] text-on-surface-variant shrink-0">${esc(it.tag)}</span>`:''}</a>`;
+  const head=h=>`<p class="px-4 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">${h}</p>`;
+  const paint=groups=>{items=[];let html='';groups.forEach(([h,list])=>{if(!list.length)return;html+=head(h)+list.map(x=>{items.push(x);return row(x,items.length-1)}).join('')});
+    box.innerHTML=html;box.classList.toggle('hidden',!items.length);input.setAttribute('aria-expanded',String(!!items.length))};
+  const close=()=>{box.classList.add('hidden');input.setAttribute('aria-expanded','false');act=-1};
+  const go=q=>{esRemember(q);close();onSearch?onSearch(q):location.href='videos.html?q='+encodeURIComponent(q)};
+  async function update(){const q=input.value.trim(),my=++seq,lq=q.toLowerCase();act=-1;
+    if(!q){const r=recent();return paint([['Recent searches',r.map(x=>({icon:'history',html:esc(x),q:x}))],['Try',IDEAS.filter(x=>!r.includes(x)).slice(0,r.length?3:6).map(x=>({icon:'search',html:esc(x),q:x}))]])}
+    const places=[];ES.CATS.forEach(c=>{if(c.name.toLowerCase().includes(lq)||c.slug.includes(lq))places.push({icon:c.icon,html:hl(c.name,q),href:'videos.html?cat='+c.slug,tag:'Category'});
+      c.subs.forEach(([s,n])=>{if(n.toLowerCase().includes(lq)||lq.split(/\s+/).every(w=>w.length>2&&n.toLowerCase().includes(w)))places.push({icon:'subdirectory_arrow_right',html:hl(n,q),href:`videos.html?cat=${c.slug}&sub=${s}`,tag:c.name.replace(/^For /,'')})})});
+    const base=[{icon:'search',html:`Search for “<b class="text-on-surface">${esc(q)}</b>”`,q}];
+    paint([['',base],['Categories',places.slice(0,5)]]);
+    if(q.length<2)return;clearTimeout(t);t=setTimeout(async()=>{const cf=typeof cat==='function'?cat():'';const v=await ES.listVideos({q,category:cf||undefined,limit:5}).catch(()=>[]);if(my!==seq)return;
+      paint([['',base],['Categories',places.slice(0,5)],['Videos',v.map(x=>({icon:'movie',html:hl(x.title,q),href:'video.html?id='+encodeURIComponent(x.id),tag:ES.subName(x.category,x.subcategory)||''}))]])},220)}
+  input.addEventListener('focus',update);input.addEventListener('input',update);
+  input.addEventListener('keydown',e=>{if(box.classList.contains('hidden'))return;
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const n=items.length;act=e.key==='ArrowDown'?(act+1>=n?-1:act+1):(act<=-1?n-1:act-1);box.querySelectorAll('[data-i]').forEach(a=>a.classList.toggle('bg-surface-container',+a.dataset.i===act));box.querySelector(`[data-i="${act}"]`)?.scrollIntoView({block:'nearest'})}
+    else if(e.key==='Enter'&&act>=0){e.preventDefault();const it=items[act];if(it.href){esRemember(input.value);location.href=it.href}else{input.value=it.q;go(it.q)}}
+    else if(e.key==='Enter')close();else if(e.key==='Escape'){e.stopPropagation();close()}});
+  box.addEventListener('mousedown',e=>e.preventDefault());   // keep focus in the input
+  box.addEventListener('click',e=>{const a=e.target.closest('[data-i]');if(!a)return;const it=items[+a.dataset.i];if(it.href){esRemember(input.value);return}e.preventDefault();input.value=it.q;go(it.q)});
+  input.addEventListener('blur',()=>setTimeout(close,120));
+  return{close};
+};
 function openSearch(){if(document.getElementById('es-sov')||document.getElementById('es-login'))return;const m=document.createElement('div');m.id='es-sov';m.className='fixed inset-0 z-[60] bg-black/50 flex justify-center px-4 pt-[12vh]';
   m.innerHTML=`<form class="w-full max-w-xl" role="search"><input name="q" aria-label="Search videos" placeholder="Describe the shot — e.g. doctor talking to patient, gavel, handshake" class="w-full px-5 py-4 rounded-2xl border-0 shadow-2xl text-base focus:ring-2 focus:ring-primary"></form>`;
-  document.body.appendChild(m);m.querySelector('input').focus();m.onclick=e=>{if(e.target===m)m.remove()};m.querySelector('form').onsubmit=e=>{e.preventDefault();location.href='videos.html?q='+encodeURIComponent(e.target.q.value.trim())}}
-document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch()}if(e.key==='Escape')document.getElementById('es-sov')?.remove()});
+  document.body.appendChild(m);const si=m.querySelector('input');si.parentElement.classList.add('es-sug-host');esSuggest(si);si.focus();m.onclick=e=>{if(e.target===m)m.remove()};m.querySelector('form').onsubmit=e=>{e.preventDefault();const q=e.target.q.value.trim();esRemember(q);location.href='videos.html?q='+encodeURIComponent(q)}}
+document.addEventListener('keydown',e=>{if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'')&&!document.getElementById('es-login')){const i=document.querySelector('#hero-search [name=q],#q');e.preventDefault();i?i.focus():openSearch();return}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch()}if(e.key==='Escape')document.getElementById('es-sov')?.remove()});
 header();footer();
 ES.ready.then(()=>{header();footer()});
 ES.onChange(()=>{header();footer()});

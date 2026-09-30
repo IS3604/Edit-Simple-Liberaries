@@ -321,14 +321,14 @@ function renderVideos() {
     list.sort((a, b) => first[a.file_hash] - first[b.file_hash] || String(a.file_hash).localeCompare(String(b.file_hash)) || new Date(a.created_at) - new Date(b.created_at) || (a.id < b.id ? -1 : 1));
     list.forEach(v => (grp[v.file_hash] = grp[v.file_hash] || []).push(v));
   }
-  const cols = (isSuper() ? 5 : 4) + (topLevel && selMode ? 1 : 0);
+  const cols = (isSuper() ? 5 : 4) + (selMode ? 1 : 0);
   const groupHead = v => { const g = grp[v.file_hash]; if (!g || g[0] !== v) return '';
     return `<tr class="bg-amber-50/70 border-b border-amber-200"><td colspan="${cols}" class="px-3 py-2 text-xs font-semibold text-amber-900"><span class="material-symbols-outlined !text-sm align-middle mr-1">content_copy</span>Same file · ${g.length} copies · original: “${esc(v.title)}”</td></tr>`; };
   const role_ = v => { const g = grp[v.file_hash]; if (!g) return ''; const i = g.indexOf(v);
     return i === 0 ? '<span class="inline-block text-[10px] font-bold uppercase bg-green-100 text-green-800 px-1.5 py-0.5 rounded mr-1">Original</span>' : `<span class="inline-block text-[10px] font-bold uppercase bg-surface-container text-on-surface-variant px-1.5 py-0.5 rounded mr-1">Variant ${i}</span>`; };
   $('#vempty').classList.toggle('hidden', list.length > 0);
   $('#vrows').innerHTML = list.map(v => groupHead(v) + `<tr data-vrow="${v.id}" class="${grp[v.file_hash] && grp[v.file_hash][0] !== v ? 'dupvar ' : ''}border-b border-outline-variant/30 last:border-0 align-top ${vsel.has(v.id) ? 'bg-primary-fixed/40' : ''}">
-    ${topLevel && selMode ? `<td class="p-3 w-10 vselcell"><input type="checkbox" data-sel="${v.id}" ${vsel.has(v.id) ? 'checked' : ''} aria-label="Select ${esc(v.title)}" class="rounded text-primary focus:ring-primary mt-1"></td>` : ''}
+    ${selMode ? `<td class="p-3 w-10 vselcell"><input type="checkbox" data-sel="${v.id}" ${vsel.has(v.id) ? 'checked' : ''} aria-label="Select ${esc(v.title)}" class="rounded text-primary focus:ring-primary mt-1"></td>` : ''}
     <td class="p-3"><div class="flex items-center gap-3"><button data-play="${v.id}" class="relative w-24 aspect-video rounded-md bg-surface-container overflow-hidden shrink-0" aria-label="Preview">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" loading="lazy" class="w-full h-full object-cover" alt="">` : ''}<span class="material-symbols-outlined absolute inset-0 m-auto h-fit w-fit text-white drop-shadow !text-xl">play_circle</span></button>
       <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${role_(v)}${esc(v.title)}</p>${copies.has(v.id) && s !== 'dup' ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded mt-0.5"><span class="material-symbols-outlined !text-xs">content_copy</span>Duplicate</span>' : ''}<p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
     <td class="p-3 whitespace-nowrap">${esc(cname(v.category))}<br><span class="text-xs text-on-surface-variant">${esc(cname(v.subcategory))}</span></td>
@@ -343,11 +343,12 @@ function renderVideos() {
   $('#vActTh').classList.toggle('hidden', !isSuper());
   shownIds = list.map(v => v.id); paintBulk();
 }
-// ---------------- BULK ACTIONS (owner only): select many videos → approve / make live / draft / delete ----------------
+// ---------------- BULK ACTIONS: select many videos. Superadmin/owner → approve / reject / live / draft / delete; admin → withdraw own pending/rejected uploads ----------------
 const vsel = new Set(); let shownIds = [], lastPick = null, bulkBusy = false;
 function paintBulk() {
-  $('#selMode').classList.toggle('hidden', !topLevel);
-  const on = topLevel && selMode; $('#vSelTh').classList.toggle('hidden', !on);
+  $('#selMode').classList.remove('hidden');
+  $$('#vbulk [data-for]').forEach(b => b.classList.toggle('hidden', b.dataset.for !== (isSuper() ? 'super' : 'admin')));
+  const on = selMode; $('#vSelTh').classList.toggle('hidden', !on);
   $('#selMode').setAttribute('aria-pressed', String(on)); $('#selMode .lbl').textContent = on ? 'Cancel' : 'Select';
   $('#selMode').classList.toggle('bg-on-surface', on); $('#selMode').classList.toggle('text-white', on);
   if (!on) { $('#vbulk').classList.add('hidden'); return; }
@@ -377,12 +378,21 @@ $('#vbulk').onclick = async e => {
   const b = e.target.closest('[data-bulk]'); if (!b || bulkBusy) return; const kind = b.dataset.bulk;
   if (kind === 'clear') { vsel.clear(); selMode = false; return renderVideos(); }
   const sel = videos.filter(v => vsel.has(v.id));
-  const target = { approve: sel.filter(v => v.status === 'pending'), live: sel.filter(v => v.status === 'approved' && !v.published), draft: sel.filter(v => v.status === 'approved' && v.published), delete: sel }[kind];
-  const label = { approve: 'approve', live: 'make live', draft: 'move to draft', delete: 'delete' }[kind];
+  if (!isSuper() && kind !== 'withdraw') return;
+  const own = v => v.submitted_by === me.id && (v.status === 'pending' || v.status === 'rejected');
+  const target = { withdraw: sel.filter(own), reject: sel.filter(v => v.status === 'pending'), approve: sel.filter(v => v.status === 'pending'), live: sel.filter(v => v.status === 'approved' && !v.published), draft: sel.filter(v => v.status === 'approved' && v.published), delete: sel }[kind];
+  const label = { withdraw: 'withdraw', reject: 'reject', approve: 'approve', live: 'make live', draft: 'move to draft', delete: 'delete' }[kind];
   const skip = sel.length - target.length;
-  if (!target.length) return toast(`Nothing to ${label} — ${{ approve: 'none of the selected videos are pending', live: 'none are approved drafts', draft: 'none are live' }[kind]}.`, 1);
+  if (!target.length) return toast(`Nothing to ${label} — ${{ withdraw: 'you can only withdraw your own uploads that are waiting for review or were rejected', reject: 'none of the selected videos are pending', approve: 'none of the selected videos are pending', live: 'none are approved drafts', draft: 'none are live' }[kind]}.`, 1);
   const nm = x => `${x} video${x === 1 ? '' : 's'}`;
-  if (kind === 'delete') {
+  let note = null;
+  const skipTxt = skip ? `\n${nm(skip)} in your selection ${skip === 1 ? "doesn't" : "don't"} apply and will be left as ${skip === 1 ? 'it is' : 'they are'}.` : '';
+  if (kind === 'withdraw') {
+    if (!await ask({ title: `Withdraw ${nm(target.length)}?`, tone: 'danger', icon: 'undo', ok: `Withdraw ${nm(target.length)}`, cancel: 'Keep them',
+      message: `They are removed from the review queue and deleted with their files. This can't be undone.${skipTxt}`, details: target.map(v => v.title), typeWord: target.length >= 10 ? 'DELETE' : null })) return;
+  } else if (kind === 'reject') {
+    note = await askReject(nm(target.length)); if (note === null) return;
+  } else if (kind === 'delete') {
     const live = target.filter(isLive).length;
     if (!await ask({ title: `Delete ${nm(target.length)}?`, tone: 'danger', ok: `Delete ${nm(target.length)}`,
       message: `Their files are removed too. This can't be undone.${live ? `\n${live} of them ${live === 1 ? 'is' : 'are'} live on the website.` : ''}`,
@@ -394,13 +404,13 @@ $('#vbulk').onclick = async e => {
   bulkBusy = true; paintBulk(); const ids = target.map(v => v.id); let done = 0; const fails = [];
   for (let i = 0; i < ids.length; i += 100) {
     const chunk = ids.slice(i, i + 100); $('#vbCount').textContent = `Working… ${done}/${ids.length}`;
-    const q = kind === 'delete' ? sb.from('videos').delete() : sb.from('videos').update(kind === 'approve' ? { status: 'approved', published: true, reviewed_by: me.id, review_note: null } : { published: kind === 'live' });
+    const q = kind === 'delete' || kind === 'withdraw' ? sb.from('videos').delete() : kind === 'reject' ? sb.from('videos').update({ status: 'rejected', reviewed_by: me.id, review_note: note }) : sb.from('videos').update(kind === 'approve' ? { status: 'approved', published: true, reviewed_by: me.id, review_note: null } : { published: kind === 'live' });
     const { data, error } = await q.in('id', chunk).select('id');
     if (error) fails.push(error.message); else { done += (data || []).length; (data || []).forEach(r => vsel.delete(r.id)); if ((data || []).length < chunk.length) fails.push(`${chunk.length - data.length} not allowed`); }
   }
   bulkBusy = false;
-  if (kind === 'delete' && done) cleanStorage();                                                  // files of deleted videos are queued by the database
-  const past = { approve: 'approved', live: 'made live', draft: 'moved to draft', delete: 'deleted' }[kind];
+  if (kind === 'delete' && done) cleanStorage();                                                  // (withdrawn files are queued too and removed on the next superadmin cleanup)                                                  // files of deleted videos are queued by the database
+  const past = { withdraw: 'withdrawn', reject: 'rejected', approve: 'approved', live: 'made live', draft: 'moved to draft', delete: 'deleted' }[kind];
   toast(fails.length ? `${done} ${past}; ${ids.length - done} failed — ${explainError(new Error(fails[0]), 'Some').replace(/^Some failed: /, '')}` : `${done} video${done === 1 ? '' : 's'} ${past}${skip ? ` · ${skip} skipped` : ''}`, fails.length > 0);
   await loadAll();
 };
@@ -800,11 +810,11 @@ function bPaint(one) {
   $('#bclear').classList.toggle('hidden', bRunning || !bq.length); $$('#bSetup select, #bSetup input').forEach(x => x.disabled = bRunning || (x.id === 'bsub' && (!$('#bcat').value || $('#bcat').value === 'auto')));
 }
 function bAdd(files) {
-  let skipped = 0; const have = new Set(bq.map(x => x.file.name + '|' + x.file.size));
+  let skipped = 0, added = 0; const have = new Set(bq.map(x => x.file.name + '|' + x.file.size));
   for (const f of files) { if (!VIDEO_EXT.test(f.name) && !/^video\//.test(f.type)) { skipped++; continue; } const k = f.name + '|' + f.size; if (have.has(k)) continue; have.add(k);
-    const ct = cleanTitle(f.name); bq.push({ id: Math.random().toString(36).slice(2, 9), file: f, path: f.webkitRelativePath || f._path || '', state: 'waiting', title: ct.title, weak: ct.weak }); }
+    const ct = cleanTitle(f.name); bq.push({ id: Math.random().toString(36).slice(2, 9), file: f, path: f.webkitRelativePath || f._path || '', state: 'waiting', title: ct.title, weak: ct.weak }); added++; }
   bq.sort((a, b) => a.state !== 'waiting' || b.state !== 'waiting' ? 0 : (a.path || a.file.name).localeCompare(b.path || b.file.name, undefined, { numeric: true }));
-  if (skipped) toast(`${skipped} non-video file(s) ignored`); bPaint();
+  if (added || skipped) toast(`${added} video${added === 1 ? '' : 's'} added to the list${skipped ? ` · ${skipped} non-video file${skipped === 1 ? '' : 's'} ignored` : ''} — nothing is uploaded until you press Upload`); bPaint();
 }
 async function entryFiles(entry, path = '') {                                   // drag & drop folders
   if (entry.isFile) return new Promise(r => entry.file(f => { f._path = path + f.name; r([f]); }, () => r([])));
@@ -889,10 +899,18 @@ async function bOne(it, opts, seen) {
 async function bRun() {
   const opts = { cat: $('#bcat').value, sub: $('#bsub').value, mode: $('#bpub').value, skip: $('#bskip').checked };
   if (!opts.cat || (opts.cat !== 'auto' && !opts.sub)) return toast('Choose a category (or Auto) and a subcategory first', 1);
-  const nameless = bq.filter(x => x.state === 'waiting' && !String(x.title || '').trim());
-  if (nameless.length && !await ask({ title: `${nameless.length} video${nameless.length === 1 ? ' has' : 's have'} no title`, tone: 'warning', icon: 'title',
-    message: `Their file names contain no words, so the AI can't describe them.\nIf you continue they are uploaded as DRAFTS (not on the website) without description or tags${opts.cat === 'auto' ? ', and Auto may not find the right category' : ''}. You can fix them later in Videos.`,
-    details: nameless.map(x => x.path || x.file.name), ok: 'Upload anyway as drafts', cancel: 'Add titles first' })) { $('#blist input[data-bt]:placeholder-shown')?.focus(); return; }
+  // One clear in-page confirmation for every role before anything is uploaded
+  const wait = bq.filter(x => x.state === 'waiting'), nameless = wait.filter(x => !String(x.title || '').trim());
+  const size = mb(wait.reduce((a, x) => a + x.file.size, 0)), nm = x => `${x} video${x === 1 ? '' : 's'}`;
+  const where = opts.cat === 'auto' ? 'Category: ✨ Auto — chosen for each video' : `Category: ${cname(opts.cat)} › ${cname(opts.sub)}`;
+  const what = !isSuper() ? 'They are sent to a superadmin for review and appear on the website only after approval.'
+    : opts.mode === 'approve' ? 'They go LIVE on the website as soon as each upload finishes.' : 'They are saved as DRAFTS (hidden from the website) — publish them later in Videos.';
+  const lines = [what, where, opts.skip ? 'Videos already in the library are skipped.' : 'Videos already in the library are uploaded again as variants.'];
+  if (nameless.length) lines.push(`⚠ ${nm(nameless.length)} ${nameless.length === 1 ? 'has' : 'have'} no title (the file name has no words): ${isSuper() ? `${nameless.length === 1 ? 'it is' : 'they are'} uploaded as a DRAFT without description or tags. Fix ${nameless.length === 1 ? 'it' : 'them'} later in Videos.` : `${nameless.length === 1 ? 'it is' : 'they are'} sent as “Untitled clip” without description or tags and will likely be rejected — better to type titles first.`}`);
+  if (!await ask({ title: `Upload ${nm(wait.length)} (${size})?`, icon: 'cloud_upload', tone: nameless.length ? 'warning' : 'primary',
+    message: lines.join('\n'), details: wait.map(x => (!String(x.title || '').trim() ? '⚠ ' : '') + (x.title || x.path || x.file.name)),
+    ok: nameless.length ? (isSuper() ? 'Upload (untitled as drafts)' : 'Upload anyway') : isSuper() && opts.mode === 'approve' ? 'Upload & publish' : isSuper() ? 'Upload as drafts' : 'Upload for review',
+    cancel: nameless.length ? 'Add titles first' : 'Cancel' })) { if (nameless.length) $('#blist input[data-bt]:placeholder-shown')?.focus(); return; }
   bRunning = true; bStop = false; $('#bstop').textContent = 'Stop'; bPaint(); const seen = new Set();
   const next = () => bq.find(x => x.state === 'waiting');
   const worker = async () => { let it; while (!bStop && (it = next())) { it.state = 'working'; await bOne(it, opts, seen); } };
@@ -956,11 +974,15 @@ function renderGuide() {
   const card = (i, t, body) => `<div class="bg-white rounded-2xl border border-outline-variant/40 p-5"><div class="flex items-center gap-2 mb-2"><span class="material-symbols-outlined text-primary">${i}</span><h2 class="font-semibold">${t}</h2></div><div class="text-sm text-on-surface-variant space-y-1.5">${body}</div></div>`;
   const reasons = {}; rej.forEach(v => (v.review_note || '').split(/\.\s*/).map(x => x.trim()).filter(Boolean).forEach(r => reasons[r] = (reasons[r] || 0) + 1));
   const topR = Object.entries(reasons).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const max = useB2() ? 500 : 50;
   $('#guide').innerHTML = `<div class="grid gap-4 lg:grid-cols-2">
-  ${card('route', 'How it works', `<p>1. Click <b>Add video</b> and drop your file.</p><p>2. Pick the category and subcategory, then add a clear title and tags.</p><p>3. Click <b>Save</b> — a superadmin reviews it.</p><p>4. Track the result in <b>My requests</b>. Approved videos go live on the website.</p>`)}
-  ${card('checklist', 'Before you upload', `<p>• One clip per upload, max <b>${useB2() ? 500 : 50} MB</b>.</p><p>• Use a descriptive title (what is happening in the clip).</p><p>• Add 3–6 tags people would search for, e.g. <i>court, judge, gavel</i>.</p><p>• Horizontal clips work best on the website.</p>`)}
-  ${card('content_copy', 'Duplicates', `<p>If you upload a file that is already in the library you'll see a warning with a preview. Continuing saves it as “Title - Variant N”.</p>`)}
-  ${card('category', 'Categories', mains().map(m => `<p><b>${esc(m.name)}</b>: ${subsOf(m.slug).map(x => esc(x.name)).join(', ') || '—'}</p>`).join(''))}
+  ${card('route', 'How it works', `<p>1. Upload with <b>Add video</b> (one clip) or <b>Bulk upload</b> (many clips or a whole folder).</p><p>2. Every upload goes to a <b>superadmin for review</b> — nothing appears on the website until it's approved.</p><p>3. Follow each video in <b>My requests</b>: <span class="text-amber-700">Waiting</span>, <span class="text-green-700">Approved · Live</span> or <span class="text-red-700">Rejected</span> (with the reason).</p><p>4. Rejected? Fix what the reason says and upload again.</p>`)}
+  ${card('upload_file', 'Add video (one clip)', `<p>• Drop the file — duration, resolution, fps, orientation and thumbnail are read automatically.</p><p>• Pick the <b>category</b> and <b>subcategory</b>.</p><p>• Write a clear title; the AI fills the description and tags — check them before you press <b>Save</b>.</p>`)}
+  ${card('drive_folder_upload', 'Bulk upload (many clips)', `<p>• Choose videos, choose a folder, or drag a folder onto the box. Non-video files are ignored.</p><p>• When you choose a folder, the <b>browser</b> asks “Upload N files to this site?” — that only adds them to the list. Dragging the folder in skips that question.</p><p>• Pick a category + subcategory, or <b>✨ Auto</b> to let the AI choose one per video from its title.</p><p>• Titles come from file names — edit them in the list. Names without words (e.g. <i>8132021-hd_1920_1080_25fps</i>) are highlighted: <b>type a title</b> or they'll likely be rejected.</p><p>• Press <b>Upload</b> → a summary box shows how many videos, the category and what happens next. Confirm to start. You can hide the window; uploads continue.</p><p>• Keep <b>“Skip videos already in the library”</b> on to avoid duplicates. Failed items show the reason and a <b>Retry</b> button.</p>`)}
+  ${card('checklist', 'Good uploads get approved', `<p>• Max <b>${max} MB</b> per clip · MP4, MOV, WEBM, M4V or MKV.</p><p>• Title = what happens in the clip: <i>“Doctor explains X-ray to patient”</i>, not <i>“IMG_2231”</i>.</p><p>• 3–6 search words as tags, e.g. <i>court, judge, gavel</i>.</p><p>• Choose the most specific subcategory. Horizontal clips work best on the website.</p><p>• No logos, watermarks or faces you don't have rights to.</p>`)}
+  ${card('checklist_rtl', 'Select several videos', `<p>• In <b>Videos</b>, press <b>Select</b>, tick videos (Shift-click selects a range, or “Select all shown”).</p><p>• <b>Withdraw my uploads</b> removes your own videos that are still waiting for review or were rejected. Approved videos can only be changed by a superadmin.</p>`)}
+  ${card('content_copy', 'Duplicates', `<p>Uploading a file that's already in the library shows a warning with a preview. Continuing saves it as “Title - Variant N”. In Bulk upload, duplicates are skipped when the skip option is on.</p>`)}
+  ${card('category', 'Categories', mains().map(m => `<details class="py-0.5"><summary class="cursor-pointer"><b>${esc(m.name)}</b> <span class="text-xs">(${subsOf(m.slug).length} subcategories)</span></summary><p class="mt-1 pl-4">${subsOf(m.slug).map(x => esc(x.name)).join(' · ') || '—'}</p></details>`).join(''))}
   ${card('insights', 'Your results', `<p>${mine.length} uploaded · <span class="text-green-700">${mine.filter(isLive).length} live</span> · <span class="text-amber-700">${mine.filter(v => v.status === 'pending').length} waiting</span> · <span class="text-red-700">${rej.length} rejected</span></p>${topR.length ? `<p class="pt-1">Most common rejection reasons:</p>${topR.map(([r, n]) => `<p>• ${esc(r)} <span class="text-xs">(${n}×)</span></p>`).join('')}` : ''}`)}
   </div>`;
 }
