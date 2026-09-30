@@ -223,13 +223,13 @@ async function sweepStorage() {
     const d = await run(true), n = d.supabase + d.b2;
     if (!n) { st.textContent = '✓ No unused files found' + (d.b2Checked ? '' : ' (B2 not set up — only Supabase checked)') + '.'; return; }
     st.textContent = `Found ${n} unused file(s) — ${d.supabase} in Supabase, ${d.b2} in B2 (${mb(d.bytes)}).`;
-    if (!confirm(`Delete ${n} unused file(s) (${mb(d.bytes)})? Files used by any video are never touched.`)) return;
+    if (!await ask({ title: `Delete ${n} unused file${n === 1 ? '' : 's'}?`, message: `This frees ${mb(d.bytes)}. Files used by any video are never touched.`, ok: 'Delete files', tone: 'danger' })) return;
     st.textContent = 'Deleting…'; const r = await run(false);
     st.textContent = `✓ Deleted ${r.supabase + r.b2} unused file(s), freed ${mb(r.bytes)}.`; toast('Storage cleaned up');
   } catch (e) { st.innerHTML = `<span class="text-error">${esc(e.message)}</span>`; } finally { btn.disabled = false; }
 }
 async function migrateAll(list) {
-  if (!confirm(`Move ${list.length} video(s) from Supabase to B2? Keep this tab open until it finishes.`)) return;
+  if (!await ask({ title: `Move ${list.length} video${list.length === 1 ? '' : 's'} to B2?`, message: 'Keep this tab open until it finishes. You can stop at any time.', ok: 'Start moving', icon: 'cloud_sync' })) return;
   migrating = true; stopMigrate = false; let ok = 0, bad = 0; const errs = [];
   $('#migBtn').outerHTML = '<button id="migStop" class="border border-outline-variant rounded-lg px-4 py-2 text-sm font-semibold">Stop</button>';
   $('#migStop').onclick = () => { stopMigrate = true; $('#migStop').disabled = true; $('#migStop').textContent = 'Stopping…'; };
@@ -314,14 +314,14 @@ function renderVideos() {
     list.sort((a, b) => first[a.file_hash] - first[b.file_hash] || String(a.file_hash).localeCompare(String(b.file_hash)) || new Date(a.created_at) - new Date(b.created_at) || (a.id < b.id ? -1 : 1));
     list.forEach(v => (grp[v.file_hash] = grp[v.file_hash] || []).push(v));
   }
-  const cols = (isSuper() ? 5 : 4) + (topLevel ? 1 : 0);
+  const cols = (isSuper() ? 5 : 4) + (topLevel && selMode ? 1 : 0);
   const groupHead = v => { const g = grp[v.file_hash]; if (!g || g[0] !== v) return '';
     return `<tr class="bg-amber-50/70 border-b border-amber-200"><td colspan="${cols}" class="px-3 py-2 text-xs font-semibold text-amber-900"><span class="material-symbols-outlined !text-sm align-middle mr-1">content_copy</span>Same file · ${g.length} copies · original: “${esc(v.title)}”</td></tr>`; };
   const role_ = v => { const g = grp[v.file_hash]; if (!g) return ''; const i = g.indexOf(v);
     return i === 0 ? '<span class="inline-block text-[10px] font-bold uppercase bg-green-100 text-green-800 px-1.5 py-0.5 rounded mr-1">Original</span>' : `<span class="inline-block text-[10px] font-bold uppercase bg-surface-container text-on-surface-variant px-1.5 py-0.5 rounded mr-1">Variant ${i}</span>`; };
   $('#vempty').classList.toggle('hidden', list.length > 0);
   $('#vrows').innerHTML = list.map(v => groupHead(v) + `<tr data-vrow="${v.id}" class="${grp[v.file_hash] && grp[v.file_hash][0] !== v ? 'dupvar ' : ''}border-b border-outline-variant/30 last:border-0 align-top ${vsel.has(v.id) ? 'bg-primary-fixed/40' : ''}">
-    ${topLevel ? `<td class="p-3 w-10 vselcell"><input type="checkbox" data-sel="${v.id}" ${vsel.has(v.id) ? 'checked' : ''} aria-label="Select ${esc(v.title)}" class="rounded text-primary focus:ring-primary mt-1"></td>` : ''}
+    ${topLevel && selMode ? `<td class="p-3 w-10 vselcell"><input type="checkbox" data-sel="${v.id}" ${vsel.has(v.id) ? 'checked' : ''} aria-label="Select ${esc(v.title)}" class="rounded text-primary focus:ring-primary mt-1"></td>` : ''}
     <td class="p-3"><div class="flex items-center gap-3"><button data-play="${v.id}" class="relative w-24 aspect-video rounded-md bg-surface-container overflow-hidden shrink-0" aria-label="Preview">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" loading="lazy" class="w-full h-full object-cover" alt="">` : ''}<span class="material-symbols-outlined absolute inset-0 m-auto h-fit w-fit text-white drop-shadow !text-xl">play_circle</span></button>
       <div class="min-w-0"><p class="font-medium truncate max-w-[240px]">${role_(v)}${esc(v.title)}</p>${copies.has(v.id) && s !== 'dup' ? '<span class="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded mt-0.5"><span class="material-symbols-outlined !text-xs">content_copy</span>Duplicate</span>' : ''}<p class="text-xs text-on-surface-variant">by ${esc(who(v.submitted_by))} · ${new Date(v.created_at).toLocaleDateString()}</p></div></div></td>
     <td class="p-3 whitespace-nowrap">${esc(cname(v.category))}<br><span class="text-xs text-on-surface-variant">${esc(cname(v.subcategory))}</span></td>
@@ -339,17 +339,23 @@ function renderVideos() {
 // ---------------- BULK ACTIONS (owner only): select many videos → approve / make live / draft / delete ----------------
 const vsel = new Set(); let shownIds = [], lastPick = null, bulkBusy = false;
 function paintBulk() {
-  $('#vSelTh').classList.toggle('hidden', !topLevel); if (!topLevel) return;
+  $('#selMode').classList.toggle('hidden', !topLevel);
+  const on = topLevel && selMode; $('#vSelTh').classList.toggle('hidden', !on);
+  $('#selMode').setAttribute('aria-pressed', String(on)); $('#selMode .lbl').textContent = on ? 'Cancel' : 'Select';
+  $('#selMode').classList.toggle('bg-on-surface', on); $('#selMode').classList.toggle('text-white', on);
+  if (!on) { $('#vbulk').classList.add('hidden'); return; }
   for (const id of [...vsel]) if (!videos.some(v => v.id === id)) vsel.delete(id);          // gone after a refresh
   const n = vsel.size, shownSel = shownIds.filter(id => vsel.has(id)).length, all = $('#vSelAll');
   all.checked = shownIds.length > 0 && shownSel === shownIds.length; all.indeterminate = shownSel > 0 && shownSel < shownIds.length;
-  $('#vbulk').classList.toggle('hidden', !n);
-  $('#vbCount').textContent = `${n} selected`;
+  $('#vbulk').classList.remove('hidden');
+  $('#vbCount').textContent = n ? `${n} selected` : 'Tick videos to select them';
   const hidden = n - shownSel;
   $('#vbAll').textContent = shownSel < shownIds.length ? `Select all ${shownIds.length} shown` : hidden ? `${hidden} selected outside this filter` : '';
   $('#vbAll').dataset.mode = shownSel < shownIds.length ? 'all' : '';
-  $$('#vbulk button').forEach(b => b.disabled = bulkBusy);
+  $$('#vbulk [data-bulk]').forEach(b => b.disabled = bulkBusy || (!n && b.dataset.bulk !== 'clear'));
 }
+let selMode = false;
+$('#selMode').onclick = () => { selMode = !selMode; vsel.clear(); lastPick = null; renderVideos(); };
 $('#vSelAll').onchange = e => { shownIds.forEach(id => e.target.checked ? vsel.add(id) : vsel.delete(id)); renderVideos(); };
 $('#vbAll').onclick = () => { if ($('#vbAll').dataset.mode === 'all') { shownIds.forEach(id => vsel.add(id)); renderVideos(); } };
 $('#vrows').addEventListener('click', e => {
@@ -362,17 +368,22 @@ $('#vrows').addEventListener('click', e => {
 });
 $('#vbulk').onclick = async e => {
   const b = e.target.closest('[data-bulk]'); if (!b || bulkBusy) return; const kind = b.dataset.bulk;
-  if (kind === 'clear') { vsel.clear(); return renderVideos(); }
+  if (kind === 'clear') { vsel.clear(); selMode = false; return renderVideos(); }
   const sel = videos.filter(v => vsel.has(v.id));
   const target = { approve: sel.filter(v => v.status === 'pending'), live: sel.filter(v => v.status === 'approved' && !v.published), draft: sel.filter(v => v.status === 'approved' && v.published), delete: sel }[kind];
   const label = { approve: 'approve', live: 'make live', draft: 'move to draft', delete: 'delete' }[kind];
   const skip = sel.length - target.length;
   if (!target.length) return toast(`Nothing to ${label} — ${{ approve: 'none of the selected videos are pending', live: 'none are approved drafts', draft: 'none are live' }[kind]}.`, 1);
+  const nm = x => `${x} video${x === 1 ? '' : 's'}`;
   if (kind === 'delete') {
     const live = target.filter(isLive).length;
-    if (!confirm(`Delete ${target.length} video${target.length === 1 ? '' : 's'}${live ? ` (${live} live on the website)` : ''}? Their files are removed too. This cannot be undone.`)) return;
-    if (target.length >= 10 && (prompt(`Type DELETE to confirm deleting ${target.length} videos`) || '').trim().toUpperCase() !== 'DELETE') return toast('Cancelled — nothing was deleted');
-  } else if (!confirm(`${label[0].toUpperCase() + label.slice(1)} ${target.length} video${target.length === 1 ? '' : 's'}?${skip ? ` (${skip} selected video${skip === 1 ? '' : 's'} will be left as they are)` : ''}`)) return;
+    if (!await ask({ title: `Delete ${nm(target.length)}?`, tone: 'danger', ok: `Delete ${nm(target.length)}`,
+      message: `Their files are removed too. This can't be undone.${live ? `\n${live} of them ${live === 1 ? 'is' : 'are'} live on the website.` : ''}`,
+      details: target.map(v => v.title), typeWord: target.length >= 10 ? 'DELETE' : null })) return;
+  } else {
+    const t = { approve: ['Approve', 'check_circle', 'They go live on the website.'], live: ['Make live', 'visibility', 'They become visible on the website.'], draft: ['Move to draft', 'visibility_off', 'They are hidden from the website.'] }[kind];
+    if (!await ask({ title: `${t[0]} ${nm(target.length)}?`, icon: t[1], ok: t[0], message: t[2] + (skip ? `\n${nm(skip)} in your selection ${skip === 1 ? "doesn't" : "don't"} apply and will be left as ${skip === 1 ? 'it is' : 'they are'}.` : ''), details: target.map(v => v.title) })) return;
+  }
   bulkBusy = true; paintBulk(); const ids = target.map(v => v.id); let done = 0; const fails = [];
   for (let i = 0; i < ids.length; i += 100) {
     const chunk = ids.slice(i, i + 100); $('#vbCount').textContent = `Working… ${done}/${ids.length}`;
@@ -396,7 +407,7 @@ $('#vrows').onclick = async e => {
   if (d.reject) return reviewVideo(v, false);
   if (d.pub) { const { error } = await sb.from('videos').update({ published: !v.published }).eq('id', v.id); if (error) return toast(error.message, 1); toast(v.published ? 'Moved to Draft — hidden from website' : 'Now live on website'); return loadAll(); }
   if (d.del) {
-    if (!confirm(`Delete "${v.title}"? This also removes its uploaded files.`)) return;
+    if (!await ask({ title: 'Delete this video?', message: `“${v.title}” and its files will be removed${isLive(v) ? ' — it is live on the website' : ''}. This can't be undone.`, ok: 'Delete', tone: 'danger' })) return;
     const paths = [v.video_url, v.thumbnail_url].map(storagePath).filter(Boolean); if (paths.length) await sb.storage.from('videos').remove(paths);
     const { error } = await sb.from('videos').delete().eq('id', v.id); if (error) return toast(error.message, 1); toast('Deleted'); cleanStorage(); return loadAll();
   }
@@ -413,6 +424,29 @@ async function request(entity, action, target, payload, summary) {
 
 // ---- Reject dialog (returns note or null) ----
 const REASONS = ['Poor video quality', 'Wrong category', 'Title / tags need work', 'Duplicate video', 'Copyright concern', 'Not relevant for lawyers/doctors'];
+// ---- In-page confirmation box (replaces the browser's plain "site says" pop-ups) ----
+// ask({ title, message, ok, cancel, tone: 'danger'|'primary'|'warning', icon, typeWord, details }) → Promise<boolean>
+function ask(o) {
+  return new Promise(res => {
+    const tone = o.tone || 'primary', col = { danger: ['bg-red-100 text-red-700', 'bg-red-600 hover:bg-red-700 text-white'], warning: ['bg-amber-100 text-amber-800', 'bg-primary hover:brightness-95 text-on-primary'], primary: ['bg-primary-fixed text-primary', 'bg-primary hover:brightness-95 text-on-primary'] }[tone];
+    const icon = o.icon || { danger: 'delete', warning: 'warning', primary: 'help' }[tone];
+    const w = document.createElement('div'); w.className = 'fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4 askbox'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true');
+    w.innerHTML = `<div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 login-card">
+      <div class="flex gap-4"><span class="w-11 h-11 shrink-0 rounded-full grid place-items-center ${col[0]}"><span class="material-symbols-outlined">${icon}</span></span>
+      <div class="min-w-0 flex-1"><h2 class="text-lg font-bold" id="askT">${esc(o.title || 'Are you sure?')}</h2>${o.message ? `<p class="text-sm text-on-surface-variant mt-1 whitespace-pre-line">${esc(o.message)}</p>` : ''}
+      ${o.details?.length ? `<ul class="mt-3 max-h-40 overflow-y-auto text-sm bg-surface-container-low rounded-lg px-3 py-2 space-y-1">${o.details.slice(0, 50).map(d => `<li class="truncate">• ${esc(d)}</li>`).join('')}${o.details.length > 50 ? `<li class="text-on-surface-variant">…and ${o.details.length - 50} more</li>` : ''}</ul>` : ''}
+      ${o.typeWord ? `<label class="block text-sm mt-4">Type <b>${esc(o.typeWord)}</b> to confirm<input data-type class="w-full mt-1 rounded-lg border-outline-variant focus:ring-red-500 focus:border-red-500" autocomplete="off" spellcheck="false"></label>` : ''}</div></div>
+      <div class="flex justify-end gap-2 mt-6"><button data-no class="px-4 py-2 rounded-lg font-semibold border border-outline-variant hover:bg-surface-container">${esc(o.cancel || 'Cancel')}</button><button data-yes class="px-4 py-2 rounded-lg font-semibold disabled:opacity-40 disabled:cursor-not-allowed ${col[1]}">${esc(o.ok || 'OK')}</button></div></div>`;
+    document.body.appendChild(w);
+    const yes = w.querySelector('[data-yes]'), no = w.querySelector('[data-no]'), inp = w.querySelector('[data-type]');
+    const done = v => { w.remove(); document.removeEventListener('keydown', key, true); res(v); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } else if (e.key === 'Enter' && !yes.disabled && document.activeElement !== no) { e.preventDefault(); done(true); } };
+    if (inp) { yes.disabled = true; inp.oninput = () => yes.disabled = inp.value.trim().toUpperCase() !== o.typeWord.toUpperCase(); }
+    yes.onclick = () => done(true); no.onclick = () => done(false); w.onclick = e => { if (e.target === w) done(false); };
+    document.addEventListener('keydown', key, true);
+    setTimeout(() => (inp || (tone === 'danger' ? no : yes)).focus(), 30);
+  });
+}
 function askReject(what) {
   return new Promise(res => {
     const m = $('#rjmodal'), f = $('#rjform'); f.reset(); $('#rjwhat').textContent = what;
@@ -754,6 +788,7 @@ function bPaint(one) {
     done ? `${n('done')} uploaded · ${n('skipped')} skipped · ${n('failed')} failed${n('waiting') ? ` · ${n('waiting')} waiting` : ''}` : `${bq.length} video${bq.length === 1 ? '' : 's'} ready (${mb(bq.reduce((a, x) => a + x.file.size, 0))})${bq.filter(x => !String(x.title || '').trim()).length ? ` · ${bq.filter(x => !String(x.title || '').trim()).length} need a title` : ''}`;
   $('#bbar').classList.toggle('hidden', !bRunning && !done); $('#bbar > div').style.width = (bq.length ? done / bq.length * 100 : 0) + '%';
   $('#bstart').disabled = bRunning || !n('waiting'); $('#bstart').textContent = done && n('waiting') ? 'Upload remaining' : 'Upload';
+  const finished = !bRunning && done > 0; $('#bdone').classList.toggle('hidden', !finished); $('#bstart').classList.toggle('hidden', finished && !n('waiting'));
   $('#bstop').classList.toggle('hidden', !bRunning); $('#bretry').classList.toggle('hidden', bRunning || !n('failed'));
   $('#bclear').classList.toggle('hidden', bRunning || !bq.length); $$('#bSetup select, #bSetup input').forEach(x => x.disabled = bRunning || (x.id === 'bsub' && (!$('#bcat').value || $('#bcat').value === 'auto')));
 }
@@ -795,7 +830,7 @@ async function bOne(it, opts, seen) {
   const set = (msg, pc) => { it.msg = msg; if (pc !== undefined) it.pc = pc; bPaint(it); };
   let stage = 'Reading the video';
   try {
-    it.state = 'working'; it.cat = it.sub = ''; set('Reading video…', 0.02);
+    it.state = 'working'; it.cat = it.sub = ''; it.catGuess = false; set('Reading video…', 0.02);
     const ext = (it.file.name.match(/\.(\w+)$/) || [])[1] || '';
     if (!VIDEO_EXT.test(it.file.name)) throw new Error(`Only video files — .${ext || '?'} is not supported`);
     const max = (useB2() ? 500 : 50) * 1024 * 1024; if (it.file.size > max) throw new Error(`over ${useB2() ? 500 : 50} MB (this file is ${mb(it.file.size)})`);
@@ -817,7 +852,10 @@ async function bOne(it, opts, seen) {
       stage = 'Choosing the category';
       const txt = [title, ...(ai?.tags || [])].join(' ');                   // title + tags only (descriptions are too generic to trust)
       if (ai?.category && subsOf(ai.category).length) { cat = ai.category; sub = subsOf(cat).some(x => x.slug === ai.subcategory) ? ai.subcategory : (guessCategory(txt, cat)?.sub || subsOf(cat)[0].slug); }
-      else { const g = guessCategory(txt); if (!g) throw new Error(weak ? 'NOCAT_WEAK' : 'NOCAT'); cat = g.cat; sub = g.sub; }
+      else { const g = guessCategory(txt) || (weak ? guessCategory((it.path || '').split('/').slice(0, -1).join(' ')) : null);   // nameless file: try its folder name
+        if (g) { cat = g.cat; sub = g.sub; }
+        else if (weak) { cat = mains()[0]?.slug; sub = subsOf(cat)[0]?.slug; it.catGuess = true; if (!cat || !sub) throw new Error('NOCAT_WEAK'); }   // draft anyway; category must be checked
+        else throw new Error('NOCAT'); }
       it.cat = cat; it.sub = sub;
     }
     stage = 'Uploading the video'; set('Uploading video…', 0.1);
@@ -830,7 +868,7 @@ async function bOne(it, opts, seen) {
     if (error) { if (isSuper()) cleanStorage(); throw new Error(error.message); }
     it.saved = saved?.title || title; it.state = 'done'; it.pc = 1;
     set([saved && saved.title !== title ? (/Variant \d+$/.test(saved.title) ? 'saved as a variant' : 'title was taken — renamed') : '',
-      weak ? 'no title — saved as draft, add a title & description later' : ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ')
+      weak ? `no title — saved as DRAFT${it.catGuess ? ' in a placeholder category' : ''}: add a title, category & description in Videos` : ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ')
       || (isSuper() ? (opts.mode === 'approve' ? 'live' : 'draft') : 'sent for review'));
   } catch (e) {
     it.state = 'failed';
@@ -844,6 +882,10 @@ async function bOne(it, opts, seen) {
 async function bRun() {
   const opts = { cat: $('#bcat').value, sub: $('#bsub').value, mode: $('#bpub').value, skip: $('#bskip').checked };
   if (!opts.cat || (opts.cat !== 'auto' && !opts.sub)) return toast('Choose a category (or Auto) and a subcategory first', 1);
+  const nameless = bq.filter(x => x.state === 'waiting' && !String(x.title || '').trim());
+  if (nameless.length && !await ask({ title: `${nameless.length} video${nameless.length === 1 ? ' has' : 's have'} no title`, tone: 'warning', icon: 'title',
+    message: `Their file names contain no words, so the AI can't describe them.\nIf you continue they are uploaded as DRAFTS (not on the website) without description or tags${opts.cat === 'auto' ? ', and Auto may not find the right category' : ''}. You can fix them later in Videos.`,
+    details: nameless.map(x => x.path || x.file.name), ok: 'Upload anyway as drafts', cancel: 'Add titles first' })) { $('#blist input[data-bt]:placeholder-shown')?.focus(); return; }
   bRunning = true; bStop = false; $('#bstop').textContent = 'Stop'; bPaint(); const seen = new Set();
   const next = () => bq.find(x => x.state === 'waiting');
   const worker = async () => { let it; while (!bStop && (it = next())) { it.state = 'working'; await bOne(it, opts, seen); } };
@@ -871,9 +913,10 @@ $('#bdrop').ondrop = async e => { e.preventDefault(); $('#bdrop').classList.remo
 $('#blist').onclick = e => { const id = e.target.closest('[data-brm]')?.dataset.brm; if (id) { bq = bq.filter(x => x.id !== id); bPaint(); } };
 $('#bclear').onclick = () => { bq = []; bPaint(); };
 $('#bstart').onclick = bRun;
+$('#bdone').onclick = () => { $('#bmodal').classList.add('hidden'); bq = []; bPaint(); tab('videos'); };
 $('#bstop').onclick = () => { bStop = true; $('#bstop').textContent = 'Stopping after current…'; };
 $('#bretry').onclick = () => { bq.forEach(x => { if (x.state === 'failed') { x.state = 'waiting'; x.msg = ''; x.pc = 0; } }); bRun(); };
-$('#bClose').onclick = () => { if (bRunning && !confirm('Uploads are still running. Hide this window? They will keep going in the background.')) return; $('#bmodal').classList.add('hidden'); };
+$('#bClose').onclick = async () => { if (bRunning && !await ask({ title: 'Uploads are still running', message: 'Hide this window? The uploads keep going in the background — reopen Bulk upload to see progress.', ok: 'Hide window', cancel: 'Keep watching', icon: 'cloud_upload' })) return; $('#bmodal').classList.add('hidden'); };
 window.addEventListener('beforeunload', e => { if (bRunning) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------------- REVIEW (superadmin) ----------------
@@ -927,7 +970,7 @@ function renderMyReq() {
     ${v.status === 'rejected' && v.review_note ? `<div class="mt-3 rounded-lg bg-red-50 border border-red-100 p-3 text-sm text-red-800"><b>Reason:</b> ${esc(v.review_note)}</div>` : ''}</div>`; }).join('')
     || '<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined !text-5xl">video_library</span><p class="mt-2">You haven\'t uploaded any videos yet.</p></div>';
 }
-$('#myReq').onclick = async e => { const pl = e.target.closest('[data-play]')?.dataset.play; if (pl) return preview(videos.find(v => v.id === pl)); const id = e.target.closest('[data-rcancel]')?.dataset.rcancel; if (!id || !confirm('Cancel this request?')) return; const { error } = await sb.from('change_requests').delete().eq('id', id); if (error) return toast(error.message, 1); toast('Cancelled'); loadAll(); };
+$('#myReq').onclick = async e => { const pl = e.target.closest('[data-play]')?.dataset.play; if (pl) return preview(videos.find(v => v.id === pl)); const id = e.target.closest('[data-rcancel]')?.dataset.rcancel; if (!id || !await ask({ title: 'Cancel this request?', message: 'The superadmin will no longer see it.', ok: 'Cancel request', cancel: 'Keep it', tone: 'danger', icon: 'undo' })) return; const { error } = await sb.from('change_requests').delete().eq('id', id); if (error) return toast(error.message, 1); toast('Cancelled'); loadAll(); };
 
 // ---------------- CATEGORIES ----------------
 function renderCats() {
@@ -960,7 +1003,7 @@ $('#catList').onclick = async e => {
     const s = b.dataset.cdel, n = videos.filter(v => v.category === s || v.subcategory === s).length;
     if (n) return toast(`Can't delete: ${n} video(s) use this category. Move them first.`, 1);
     if (pendReqFor('category', s)) return toast('A change for this category is already pending', 1);
-    if (!confirm('Delete this category' + (subsOf(s).length ? ' and its subcategories' : '') + '?' + (isSuper() ? '' : ' (needs approval)'))) return;
+    if (!await ask({ title: 'Delete this category?', message: (subsOf(s).length ? `Its ${subsOf(s).length} subcategories are deleted too.` : 'Videos in it keep their files.') + (isSuper() ? '' : ' This needs a superadmin\'s approval.'), ok: isSuper() ? 'Delete' : 'Request delete', tone: 'danger' })) return;
     if (!isSuper()) return request('category', 'delete', s, {}, `Delete category “${cname(s)}”`);
     const { error } = await sb.from('categories').delete().eq('slug', s); if (error) return toast(error.message, 1); toast('Deleted'); loadAll();
   }
@@ -1033,9 +1076,9 @@ function renderTeamMaster() {
 async function tmRole(e) { const id = e.target.dataset.role; if (!id) return; const { data, error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id).select('user_id'); if (error || !data?.length) { toast(error?.message || "You don't have permission to change this member", 1); return loadAll(); } toast('Role updated'); loadAll(); }
 async function tmClick(e) { const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.view) return openMember(b.dataset.view);
-  if (b.dataset.rm) { if (!confirm(`Remove admin access for ${b.dataset.em}? Their uploaded videos stay.`)) return; const { data, error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm).select('user_id'); if (error || !data?.length) return toast(error?.message || "Couldn't remove this member", 1); toast('Removed'); return loadAll(); }
+  if (b.dataset.rm) { if (!await ask({ title: 'Remove this member?', message: `${b.dataset.em} will lose access to the library and admin. Their uploaded videos stay.`, ok: 'Remove', tone: 'danger', icon: 'person_remove' })) return; const { data, error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm).select('user_id'); if (error || !data?.length) return toast(error?.message || "Couldn't remove this member", 1); toast('Removed'); return loadAll(); }
   if (b.dataset.resend) { b.disabled = true; await sendInvite(b.dataset.resend, b.dataset.irole); b.disabled = false; return loadAll(); }
-  if (b.dataset.uninv) { if (!confirm(`Cancel invite for ${b.dataset.uninv}?`)) return; const { error } = await sb.from('admin_invites').delete().eq('email', b.dataset.uninv); if (error) return toast(error.message, 1); loadAll(); } }
+  if (b.dataset.uninv) { if (!await ask({ title: 'Cancel this invite?', message: `${b.dataset.uninv} won't be able to join with the link they received.`, ok: 'Cancel invite', cancel: 'Keep invite', tone: 'danger', icon: 'mail' })) return; const { error } = await sb.from('admin_invites').delete().eq('email', b.dataset.uninv); if (error) return toast(error.message, 1); loadAll(); } }
 function openMember(id) { const m = status.find(x => x.user_id === id); if (!m) return;
   const up = videos.filter(v => v.submitted_by === id).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const st = (n, l, c = '') => `<div class="rounded-xl bg-surface-container-low p-3 text-center"><p class="text-xl font-bold ${c}">${n}</p><p class="text-xs text-on-surface-variant">${l}</p></div>`;
@@ -1072,7 +1115,7 @@ function renderTeam() {
     <button data-rm="${t.user_id}" data-em="${esc(t.email)}" class="px-3 py-1.5 rounded-lg text-sm text-error font-medium hover:bg-red-50 flex items-center gap-1"><span class="material-symbols-outlined !text-base">person_remove</span>Remove</button></div>`}</div>`; }).join('');
 }
 $('#teamRows').onchange = async e => { const id = e.target.dataset.role; if (!id) return; const { data, error } = await sb.from('admins').update({ role: e.target.value }).eq('user_id', id).select('user_id'); if (error) { loadAll(); return toast(error.message, 1); } if (!data?.length) { loadAll(); return toast("You don't have permission to change this member", 1); } toast('Role updated'); loadAll(); };
-$('#teamRows').onclick = async e => { const b = e.target.closest('[data-rm]'); if (!b || !confirm(`Remove admin access for ${b.dataset.em}?`)) return; const { data, error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm).select('user_id'); if (error) return toast(error.message, 1); if (!data?.length) return toast("You don't have permission to remove this member", 1); toast('Removed'); loadAll(); };
+$('#teamRows').onclick = async e => { const b = e.target.closest('[data-rm]'); if (!b || !await ask({ title: 'Remove this member?', message: `${b.dataset.em} will lose access. Their uploaded videos stay.`, ok: 'Remove', tone: 'danger', icon: 'person_remove' })) return; const { data, error } = await sb.from('admins').delete().eq('user_id', b.dataset.rm).select('user_id'); if (error) return toast(error.message, 1); if (!data?.length) return toast("You don't have permission to remove this member", 1); toast('Removed'); loadAll(); };
 async function sendInvite(email, role) {
   const { data, error } = await sb.functions.invoke('invite-admin', { body: { email, role, redirectTo: ADMIN_URL } });
   let msg = error?.message; if (error && error.context?.json) { try { msg = (await error.context.json()).error || msg; } catch { } }
@@ -1095,6 +1138,6 @@ function renderInvites() { const el = $('#inviteRows'); if (!el) return;
     <button data-resend="${esc(i.email)}" data-role="${esc(i.role)}" class="px-3 py-1.5 rounded-lg text-primary font-medium hover:bg-primary-fixed/50">Resend</button><button data-uninv="${esc(i.email)}" class="px-3 py-1.5 rounded-lg text-error font-medium hover:bg-red-50">Cancel</button></div>`).join('') || '<p class="text-sm text-on-surface-variant bg-white rounded-xl border border-outline-variant/40 p-4">No pending invites.</p>'; }
 $('#inviteRows').onclick = async e => { const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.resend) { b.disabled = true; await sendInvite(b.dataset.resend, b.dataset.role); b.disabled = false; return; }
-  const em = b.dataset.uninv; if (!em || !confirm(`Cancel invite for ${em}?`)) return; const { error } = await sb.from('admin_invites').delete().eq('email', em); if (error) return toast(error.message, 1); loadAll(); };
+  const em = b.dataset.uninv; if (!em || !await ask({ title: 'Cancel this invite?', message: `${em} won't be able to join with the link they received.`, ok: 'Cancel invite', cancel: 'Keep invite', tone: 'danger', icon: 'mail' })) return; const { error } = await sb.from('admin_invites').delete().eq('email', em); if (error) return toast(error.message, 1); loadAll(); };
 
 boot();
