@@ -1,5 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const C = window.ES_CONFIG;
+const BUILD = '2026-10-01b'; window.ES_ADMIN_BUILD = BUILD;                                                     // must match data-build in admin.html (detects half-updated uploads / old cached files)
+if (document.documentElement.dataset.build !== BUILD) document.addEventListener('DOMContentLoaded', () => document.body.insertAdjacentHTML('afterbegin', `<div role="alert" class="fixed top-0 inset-x-0 z-[95] bg-red-600 text-white text-sm text-center px-4 py-2">This page is running mixed old/new files (admin.html build ${document.documentElement.dataset.build || '?'}, admin.js build ${BUILD}). Re-upload ALL site files, then press Ctrl+Shift+R.</div>`));
 // Read email-link params BEFORE the client consumes the URL hash
 const QS = new URLSearchParams(location.search), HP = new URLSearchParams(location.hash.slice(1));
 const LINK = { hash: QS.get('token_hash'), type: QS.get('type') || HP.get('type'), err: QS.get('error_description') || HP.get('error_description') };
@@ -897,7 +899,7 @@ async function prepareVideo(file, onMsg) {
   const needs = NONWEB_EXT.test(file.name) || await isHevc(file).catch(() => false);
   if (!needs) { try { const m = await analyzeFile(file); return { file, meta: m, thumb: m.thumb, converted: false }; } catch { } }
   onMsg?.('This video needs converting — converting to MP4 automatically…');
-  const r = await convertVideo(file, onMsg);
+  const r = await convertVideo(file, onMsg).catch(e => { console.error('convert', e); throw /^CONVERT_/.test(e?.message) ? e : new Error('CONVERT_FAILED'); });
   return { ...r, converted: true };
 }
 const convertError = e => ({ CONVERT_BIG: `too large to convert in the browser (max ${CONVERT_MAX / 1048576} MB) — export it as MP4 (H.264) and try again`,
@@ -1010,54 +1012,35 @@ $('#bcat').onchange = () => { const c = $('#bcat').value; $('#bsub').innerHTML =
 $('#blist').addEventListener('input', e => { const id = e.target.dataset.bt; if (!id) return; const it = bq.find(x => x.id === id); if (it) { it.title = e.target.value; it.weak = !e.target.value.trim(); e.target.classList.toggle('border-amber-400', it.weak); const n = bq.filter(x => !String(x.title || '').trim()).length; $('#bsum').textContent = `${bq.length} video${bq.length === 1 ? '' : 's'} ready (${mb(bq.reduce((a, x) => a + x.file.size, 0))})${n ? ` · ${n} need a title` : ''}`; } });
 $('#bfiles').onchange = e => { bAdd([...e.target.files]); e.target.value = ''; };
 // ---- "Choose a folder": our own box. Drag the folder in (no browser question) or browse for it; then confirm what was found ----
-function folderBox() {
-  if (bRunning || $('#fbox')) return;
+// ---- "Choose a folder": the button opens the folder picker directly; then OUR box shows what was found and asks to confirm ----
+function folderBox(files, name) {
+  $('#fbox')?.remove();
+  const vids = files.filter(f => VIDEO_EXT.test(f.name) || /^video\//.test(f.type)), other = files.length - vids.length, size = vids.reduce((a, f) => a + f.size, 0);
+  const conv = vids.filter(f => NONWEB_EXT.test(f.name)).length;
   const w = document.createElement('div'); w.id = 'fbox'; w.className = 'fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'fboxT');
   w.innerHTML = `<div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 login-card">
     <div class="flex items-start gap-4"><span class="w-11 h-11 shrink-0 rounded-full grid place-items-center bg-primary-fixed text-primary"><span class="material-symbols-outlined">folder_open</span></span>
-    <div class="min-w-0 flex-1"><h2 id="fboxT" class="text-lg font-bold">Add a folder of videos</h2><p class="fsub text-sm text-on-surface-variant mt-1">Every video inside the folder (and its sub-folders) is added to the upload list. Nothing is uploaded yet.</p></div>
-    <button data-x class="material-symbols-outlined text-on-surface-variant hover:text-on-surface" aria-label="Close">close</button></div>
-    <div class="fpick mt-5"><div class="fdrop rounded-xl border-2 border-dashed border-outline-variant p-6 text-center transition"><span class="material-symbols-outlined !text-4xl text-primary">drive_folder_upload</span><p class="font-semibold mt-1">Drag the folder here</p><p class="text-xs text-on-surface-variant mt-1">Quickest way — no extra questions from the browser.</p></div>
-      <div class="flex items-center gap-3 my-4 text-xs text-on-surface-variant"><span class="flex-1 h-px bg-outline-variant/60"></span>or<span class="flex-1 h-px bg-outline-variant/60"></span></div>
-      <button data-browse class="w-full border border-outline-variant rounded-lg px-4 py-2.5 font-semibold hover:border-primary hover:text-primary flex items-center justify-center gap-2"><span class="material-symbols-outlined !text-lg">folder</span>Browse for a folder…</button>
-      <p class="text-xs text-on-surface-variant mt-2 text-center">Your browser will ask once to confirm access to that folder — choose <b>Upload</b> there. It only lets this page read the files; you confirm the upload here next.</p></div>
-    <div class="fsum hidden mt-5"></div>
-    <div class="fbtns hidden flex justify-end gap-2 mt-6"><button data-back class="px-4 py-2 rounded-lg font-semibold border border-outline-variant hover:bg-surface-container">Choose another</button><button data-add class="px-4 py-2 rounded-lg font-semibold bg-primary text-on-primary hover:brightness-95"></button></div></div>`;
+    <div class="min-w-0 flex-1"><h2 id="fboxT" class="text-lg font-bold">${vids.length ? `Add ${vids.length} video${vids.length === 1 ? '' : 's'} from “${esc(name)}”?` : `No videos in “${esc(name)}”`}</h2>
+    <p class="text-sm text-on-surface-variant mt-1">${vids.length ? 'They go to the upload list, where you can check titles. Nothing is uploaded until you press Upload.' : 'Pick a folder that contains video files.'}</p></div></div>
+    <div class="grid grid-cols-3 gap-2 text-center text-sm mt-5"><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${vids.length}</p><p class="text-xs text-on-surface-variant">videos</p></div><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${mb(size)}</p><p class="text-xs text-on-surface-variant">total size</p></div><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${other}</p><p class="text-xs text-on-surface-variant">other files ignored</p></div></div>
+    ${conv ? `<p class="text-xs text-on-surface-variant mt-3">${conv} file${conv === 1 ? ' is' : 's are'} in a format websites can't play — converted to MP4 automatically during upload.</p>` : ''}
+    ${vids.length ? `<ul class="mt-3 max-h-40 overflow-y-auto text-sm bg-surface-container-low rounded-lg px-3 py-2 space-y-1">${vids.slice(0, 40).map(f => `<li class="truncate">• ${esc(f.webkitRelativePath || f._path || f.name)}</li>`).join('')}${vids.length > 40 ? `<li class="text-on-surface-variant">…and ${vids.length - 40} more</li>` : ''}</ul>` : ''}
+    <div class="flex justify-end gap-2 mt-6"><button data-back class="px-4 py-2 rounded-lg font-semibold border border-outline-variant hover:bg-surface-container">Choose another folder</button><button data-add class="px-4 py-2 rounded-lg font-semibold bg-primary text-on-primary hover:brightness-95">${vids.length ? `Add ${vids.length} to the list` : 'Close'}</button></div></div>`;
   document.body.appendChild(w);
-  let found = [];
   const close = () => { w.remove(); document.removeEventListener('keydown', key, true); }, key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   document.addEventListener('keydown', key, true);
-  const show = (files, name) => {
-    const vids = files.filter(f => VIDEO_EXT.test(f.name) || /^video\//.test(f.type)), other = files.length - vids.length, size = vids.reduce((a, f) => a + f.size, 0);
-    const conv = vids.filter(f => NONWEB_EXT.test(f.name)).length; found = vids;
-    w.querySelector('.fpick').classList.add('hidden'); w.querySelector('.fsum').classList.remove('hidden'); w.querySelector('.fbtns').classList.remove('hidden');
-    w.querySelector('#fboxT').textContent = vids.length ? `Add ${vids.length} video${vids.length === 1 ? '' : 's'} from “${name}”?` : `No videos in “${name}”`;
-    w.querySelector('.fsub').textContent = vids.length ? 'They go to the upload list below, where you can check titles before uploading.' : 'Pick a folder that contains video files.';
-    w.querySelector('.fsum').innerHTML = `<div class="grid grid-cols-3 gap-2 text-center text-sm"><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${vids.length}</p><p class="text-xs text-on-surface-variant">videos</p></div><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${mb(size)}</p><p class="text-xs text-on-surface-variant">total size</p></div><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${other}</p><p class="text-xs text-on-surface-variant">other files ignored</p></div></div>
-      ${conv ? `<p class="text-xs text-on-surface-variant mt-3">${conv} file${conv === 1 ? ' is' : 's are'} in a format websites can't play — ${conv === 1 ? 'it is' : 'they are'} converted to MP4 automatically during upload.</p>` : ''}
-      ${vids.length ? `<ul class="mt-3 max-h-40 overflow-y-auto text-sm bg-surface-container-low rounded-lg px-3 py-2 space-y-1">${vids.slice(0, 40).map(f => `<li class="truncate">• ${esc(f.webkitRelativePath || f._path || f.name)}</li>`).join('')}${vids.length > 40 ? `<li class="text-on-surface-variant">…and ${vids.length - 40} more</li>` : ''}</ul>` : ''}`;
-    const add = w.querySelector('[data-add]'); add.textContent = vids.length ? `Add ${vids.length} to the list` : 'Close'; add.focus();
-  };
-  const back = () => { found = []; w.querySelector('.fpick').classList.remove('hidden'); w.querySelector('.fsum').classList.add('hidden'); w.querySelector('.fbtns').classList.add('hidden'); w.querySelector('#fboxT').textContent = 'Add a folder of videos'; };
-  const dz = w.querySelector('.fdrop');
-  dz.ondragover = e => { e.preventDefault(); dz.classList.add('border-primary', 'bg-primary-fixed/30'); }; dz.ondragleave = () => dz.classList.remove('border-primary', 'bg-primary-fixed/30');
-  dz.ondrop = async e => { e.preventDefault(); dz.classList.remove('border-primary', 'bg-primary-fixed/30');
-    const ents = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry?.()).filter(Boolean);
-    const files = ents.length ? (await Promise.all(ents.map(x => entryFiles(x)))).flat() : [...e.dataTransfer.files];
-    show(files, ents.length === 1 && ents[0].isDirectory ? ents[0].name : ents.length ? `${ents.length} items` : 'dropped files'); };
-  const inp = $('#bfolder'); inp.value = ''; inp.onchange = () => { const fs = [...inp.files]; inp.value = ''; if (fs.length && document.body.contains(w)) show(fs, (fs[0].webkitRelativePath || '').split('/')[0] || 'folder'); };
-  w.querySelector('[data-browse]').onclick = () => inp.click();
-  w.querySelector('[data-back]').onclick = back;
-  w.querySelector('[data-add]').onclick = () => { const f = found; close(); if (f.length) bAdd(f); };
-  w.querySelector('[data-x]').onclick = close; w.onclick = e => { if (e.target === w) close(); };
-  setTimeout(() => w.querySelector('[data-browse]').focus(), 30);
+  w.querySelector('[data-back]').onclick = () => { close(); $('#bfolder').click(); };
+  w.querySelector('[data-add]').onclick = () => { close(); if (vids.length) bAdd(vids); };
+  w.onclick = e => { if (e.target === w) close(); };
+  setTimeout(() => w.querySelector('[data-add]').focus(), 30);
 }
-$('#bfolderBtn').onclick = folderBox;
+$('#bfolder').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; if (!fs.length || bRunning) return; folderBox(fs, (fs[0].webkitRelativePath || '').split('/')[0] || 'folder'); };
 $('#bdrop').ondragover = e => { e.preventDefault(); $('#bdrop').classList.add('border-primary', 'bg-primary-fixed/30'); };
 $('#bdrop').ondragleave = () => $('#bdrop').classList.remove('border-primary', 'bg-primary-fixed/30');
 $('#bdrop').ondrop = async e => { e.preventDefault(); $('#bdrop').classList.remove('border-primary', 'bg-primary-fixed/30'); if (bRunning) return;
   const items = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry?.()).filter(Boolean);
-  bAdd(items.length ? (await Promise.all(items.map(x => entryFiles(x)))).flat() : [...e.dataTransfer.files]); };
+  const files = items.length ? (await Promise.all(items.map(x => entryFiles(x)))).flat() : [...e.dataTransfer.files];
+  if (items.length === 1 && items[0].isDirectory) folderBox(files, items[0].name); else bAdd(files); };
 $('#blist').onclick = e => { const id = e.target.closest('[data-brm]')?.dataset.brm; if (id) { bq = bq.filter(x => x.id !== id); bPaint(); } };
 $('#bclear').onclick = () => { bq = []; bPaint(); };
 $('#bstart').onclick = bRun;
@@ -1101,7 +1084,7 @@ function renderGuide() {
   $('#guide').innerHTML = `<div class="grid gap-4 lg:grid-cols-2">
   ${card('route', 'How it works', `<p>1. Upload with <b>Add video</b> (one clip) or <b>Bulk upload</b> (many clips or a whole folder).</p><p>2. Every upload goes to a <b>superadmin for review</b> — nothing appears on the website until it's approved.</p><p>3. Follow each video in <b>My requests</b>: <span class="text-amber-700">Waiting</span>, <span class="text-green-700">Approved · Live</span> or <span class="text-red-700">Rejected</span> (with the reason).</p><p>4. Rejected? Fix what the reason says and upload again.</p>`)}
   ${card('upload_file', 'Add video (one clip)', `<p>• Drop the file — duration, resolution, fps, orientation and thumbnail are read automatically.</p><p>• Pick the <b>category</b> and <b>subcategory</b>.</p><p>• Write a clear title; the AI fills the description and tags — check them before you press <b>Save</b>.</p>`)}
-  ${card('drive_folder_upload', 'Bulk upload (many clips)', `<p>• Choose videos, choose a folder, or drag a folder onto the box. Non-video files are ignored.</p><p>• <b>Choose a folder</b> opens a box: drag the folder in, or browse for it (the browser asks once to allow reading the folder). You then see how many videos were found and confirm.</p><p>• Pick a category + subcategory, or <b>✨ Auto</b> to let the AI choose one per video from its title.</p><p>• Titles come from file names — edit them in the list. Names without words (e.g. <i>8132021-hd_1920_1080_25fps</i>) are highlighted: <b>type a title</b> or they'll likely be rejected.</p><p>• Press <b>Upload</b> → a summary box shows how many videos, the category and what happens next. Confirm to start. You can hide the window; uploads continue.</p><p>• Keep <b>“Skip videos already in the library”</b> on to avoid duplicates. Failed items show the reason and a <b>Retry</b> button.</p>`)}
+  ${card('drive_folder_upload', 'Bulk upload (many clips)', `<p>• Choose videos, choose a folder, or drag a folder onto the box. Non-video files are ignored.</p><p>• <b>Choose a folder</b> opens the folder picker (Chrome then asks “Upload N files to this site?” — that only lets the page read them). A box then shows how many videos were found; confirm to add them to the list. Dragging a folder in skips Chrome's question.</p><p>• Pick a category + subcategory, or <b>✨ Auto</b> to let the AI choose one per video from its title.</p><p>• Titles come from file names — edit them in the list. Names without words (e.g. <i>8132021-hd_1920_1080_25fps</i>) are highlighted: <b>type a title</b> or they'll likely be rejected.</p><p>• Press <b>Upload</b> → a summary box shows how many videos, the category and what happens next. Confirm to start. You can hide the window; uploads continue.</p><p>• Keep <b>“Skip videos already in the library”</b> on to avoid duplicates. Failed items show the reason and a <b>Retry</b> button.</p>`)}
   ${card('checklist', 'Good uploads get approved', `<p>• Max <b>${max} MB</b> per clip. Any common video format works — files the website can't play (HEVC/H.265, MKV, AVI, WMV…) are <b>converted to MP4 automatically</b> before upload (larger files take a minute).</p><p>• Title = what happens in the clip: <i>“Doctor explains X-ray to patient”</i>, not <i>“IMG_2231”</i>.</p><p>• 3–6 search words as tags, e.g. <i>court, judge, gavel</i>.</p><p>• Choose the most specific subcategory. Horizontal clips work best on the website.</p><p>• No logos, watermarks or faces you don't have rights to.</p>`)}
   ${card('checklist_rtl', 'Select several videos', `<p>• In <b>Videos</b>, press <b>Select</b>, tick videos (Shift-click selects a range, or “Select all shown”).</p><p>• <b>Withdraw my uploads</b> removes your own videos that are still waiting for review or were rejected. Approved videos can only be changed by a superadmin.</p>`)}
   ${card('content_copy', 'Duplicates', `<p>Uploading a file that's already in the library shows a warning with a preview. Continuing saves it as “Title - Variant N”. In Bulk upload, duplicates are skipped when the skip option is on.</p>`)}
