@@ -131,15 +131,16 @@ function paintSkeletons() {
 
 // ---------------- DATA ----------------
 async function loadAll() {
-  const [c, v, r, a, inv] = await Promise.all([
+  const [c, v, r, a, inv, ts] = await Promise.all([
     sb.from('categories').select('*').order('sort'),
     sb.from('videos').select('*').order('created_at', { ascending: false }),
     sb.from('change_requests').select('*').order('created_at', { ascending: false }).limit(200),
-    sb.from('admins').select('user_id,email,role'), sb.from('admin_invites').select('*').order('created_at', { ascending: false })]);
+    sb.from('admins').select('user_id,email,role'), sb.from('admin_invites').select('*').order('created_at', { ascending: false }),
+    topLevel ? sb.rpc('team_status') : Promise.resolve({ data: [] })]);
   for (const [n, x] of [['Categories', c], ['Videos', v], ['Requests', r], ['Team', a]]) if (x.error) toast(`${n}: ${x.error.message}${/does not exist|column/.test(x.error.message) ? ' — run roles.sql' : ''}`, 1);
   const myNew = (a.data || []).find(t => t.user_id === me.id)?.role; if (a.data && lvl(myNew) !== role) { location.reload(); return; }
-  cats = c.data || []; videos = await signVideos(v.data || []); reqs = r.data || []; team = a.data || []; invites = inv?.data || [];
-  status = topLevel ? ((await sb.rpc('team_status')).data || []) : [];
+  cats = c.data || []; videos = await signVideos(v.data || []); reqs = r.data || []; team = a.data || []; invites = inv?.data || []; status = ts?.data || [];
+  catName = new Map(cats.map(x => [x.slug, x.name])); pendMap = new Map(); reqs.forEach(x => { const k = x.entity + ':' + x.target; if (x.status === 'pending' && !pendMap.has(k)) pendMap.set(k, x); });
   renderDash(); renderVideos(); renderCats(); fillCatSelects(); renderReview(); renderGuide(); renderMyReq(); renderTeam(); if (isSuper()) renderInvites(); paintUsageLists(); renderStorage();
 }
 // roles above 'admin' are all shown as superadmin
@@ -158,10 +159,11 @@ const isB2 = u => typeof u === 'string' && u.startsWith('b2:');
 const useB2 = () => (window.ES_CONFIG || {}).VIDEO_STORAGE === 'b2';
 const mains = () => cats.filter(c => !c.parent_slug);
 const subsOf = m => cats.filter(c => c.parent_slug === m);
-const cname = s => cats.find(c => c.slug === s)?.name || (s === 'both' ? 'Both (removed)' : s);
+let catName = new Map(), pendMap = new Map();                                   // lookups rebuilt once per data load (not per row)
+const cname = s => catName.get(s) || (s === 'both' ? 'Both (removed)' : s);
 const who = id => team.find(t => t.user_id === id)?.email || (id === me.id ? me.email : 'Superadmin');
 const isLive = v => v.status === 'approved' && v.published;
-const pendReqFor = (entity, target) => reqs.find(r => r.status === 'pending' && r.entity === entity && r.target === target);
+const pendReqFor = (entity, target) => pendMap.get(entity + ':' + target);
 
 // ---------------- DASHBOARD ----------------
 function renderDash() {
@@ -414,7 +416,7 @@ $('#vbulk').onclick = async e => {
   toast(fails.length ? `${done} ${past}; ${ids.length - done} failed — ${explainError(new Error(fails[0]), 'Some').replace(/^Some failed: /, '')}` : `${done} video${done === 1 ? '' : 's'} ${past}${skip ? ` · ${skip} skipped` : ''}`, fails.length > 0);
   await loadAll();
 };
-['#vq', '#vcat', '#vstat'].forEach(s => $(s).addEventListener('input', renderVideos));
+let vqT; $('#vq').addEventListener('input', () => { clearTimeout(vqT); vqT = setTimeout(renderVideos, 150); }); ['#vcat', '#vstat'].forEach(s => $(s).addEventListener('input', renderVideos));
 $('#vrows').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return; const d = b.dataset; const v = videos.find(x => x.id === (d.edit || d.del || d.pub || d.approve || d.reject || d.play));
   if (d.play) return preview(v);
@@ -495,7 +497,7 @@ function fillSubs(sel) { const f = $('#vform'), c = f.category.value; f.subcateg
   f.subcategory.innerHTML = `<option value="">${c ? 'Select subcategory' : 'Select category first'}</option>` + subsOf(c).map(s => `<option value="${esc(s.slug)}">${esc(s.name)}</option>`).join(''); f.subcategory.value = sel || ''; }
 $('#vform').category.onchange = () => { fillSubs(); };
 
-let aiFrame = null, aiSeq = 0, lastAi = null, lastAiTitle = null, editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null, newBlobUrl = null;
+let prepSingle = null, prepSeq = 0, aiFrame = null, aiSeq = 0, lastAi = null, lastAiTitle = null, editing = null, thumbBlob = null, submitMode = 'submit', fileHash = null, dupState = 'ok', hashing = null, newBlobUrl = null;
 // Turn a failed function call into a readable reason
 async function aiReason(res) {
   const e = res?.error, d = res?.data; if (d?.error) return d.error;
@@ -578,7 +580,7 @@ async function checkDuplicate(h) {
   play(items[1] || items[0]);
   $('#dupmodal').classList.remove('hidden');
 }
-function clearFile() { const f = $('#vform'); f.vfile.value = ''; setTimeout(checkTitle); aiFrame = null; fileHash = null; dupState = 'ok'; thumbBlob = null; hashing = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
+function clearFile() { const f = $('#vform'); f.vfile.value = ''; prepSingle = null; prepSeq++; setTimeout(checkTitle); aiFrame = null; fileHash = null; dupState = 'ok'; thumbBlob = null; hashing = null; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = editing?.[k] ?? '');
   if (editing?.video_url) showPicked(editing.video_url, 'Current video', `${editing.resolution} · ${dur(editing.duration_seconds)}`); else showPicked(null);}
 const closeDup = () => { const dv = $('#dupvid'); dv.pause(); dv.removeAttribute('src'); $('#dupmodal').classList.add('hidden'); };
 $('#dupCancel').onclick = () => { closeDup(); clearFile(); };
@@ -624,7 +626,7 @@ async function backfillHashes() {
 const BTN = (mode, label, cls) => `<button ${mode ? `data-mode="${mode}"` : 'type="button" data-close'} class="px-4 py-2.5 rounded-lg ${cls}">${label}</button>`;
 function openVideo(v) {
   if (v && !isSuper()) return;
-  editing = v || null; titleSeq++; $('#titleHint').classList.add('hidden'); thumbBlob = null; aiFrame = null; lastAi = null; lastAiTitle = null; aiSeq++; $('#aiStat').textContent = ''; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
+  editing = v || null; prepSingle = null; prepSeq++; titleSeq++; $('#titleHint').classList.add('hidden'); thumbBlob = null; aiFrame = null; lastAi = null; lastAiTitle = null; aiSeq++; $('#aiStat').textContent = ''; fileHash = null; dupState = 'ok'; hashing = null; const f = $('#vform'); f.reset(); $('#vtitle').textContent = v ? 'Edit video' : 'Add video';
   showPicked(null); $('#progress').classList.add('hidden'); f.category.value = '';
   const n = $('#vnote'); n.classList.toggle('hidden', isSuper()); n.textContent = 'Your video will be sent to a superadmin for review. It appears on the website only after approval.';
   $('#vbtns').innerHTML = isSuper()
@@ -667,17 +669,15 @@ $('#vform').vfile.onchange = e => {
   queueTitle();
   aiSuggest(false);                                                         // description + tags from the title
   if (weakName) { $('#aiStat').textContent = 'File name has no words — type a title and AI will write the description.'; f.title.focus(); }
-  vid.onloadedmetadata = async () => {
-    f.duration_seconds.value = Math.round(vid.duration); const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h);
-    f.resolution.value = big >= 3000 ? '4K' : big >= 1800 ? '1080p' : '720p'; f.orientation.value = w > h ? 'horizontal' : w < h ? 'vertical' : 'square';
-    f.fps.value = await detectFps(vid);
-    vid.onseeked = () => {
-      const cv = document.createElement('canvas'); const sc = Math.min(1, 1280 / vid.videoWidth); cv.width = vid.videoWidth * sc; cv.height = vid.videoHeight * sc;
-      cv.getContext('2d').drawImage(vid, 0, 0, cv.width, cv.height); cv.toBlob(b => { thumbBlob = b; }, 'image/jpeg', 0.82); vid.onseeked = null;
-    };
-    vid.currentTime = Math.min(1, vid.duration / 3);
-    $('#vmeta').textContent = `${f.resolution.value} · ${dur(+f.duration_seconds.value)}`;
-  };
+  // Read (or auto-convert) the video in the background; Save waits for it instead of failing
+  const my = ++prepSeq; ['duration_seconds', 'resolution', 'fps', 'orientation'].forEach(k => f[k].value = '');
+  prepSingle = prepareVideo(file, m => { if (my !== prepSeq) return; $('#vmeta').textContent = m; if (!$('#progress').classList.contains('hidden')) $('#ptext').textContent = m; }).then(r => {
+    if (my !== prepSeq) return r;
+    const m = r.meta; f.duration_seconds.value = m.duration_seconds || 1; f.resolution.value = m.resolution; f.orientation.value = m.orientation; f.fps.value = m.fps || 30; thumbBlob = r.thumb;
+    if (r.converted) { URL.revokeObjectURL(newBlobUrl); newBlobUrl = URL.createObjectURL(r.file); vid.src = newBlobUrl; }
+    $('#vmeta').textContent = `${m.resolution} · ${dur(m.duration_seconds)}${r.converted ? ' · converted to MP4' : ''}`; return r;
+  });
+  prepSingle.catch(e => { if (my === prepSeq) $('#vmeta').textContent = 'Could not read this video: ' + (convertError(e) || e.message); });
 };
 
 // onProgress(fraction 0..1) is optional; without it the single-upload form's progress bar is used
@@ -711,13 +711,19 @@ $('#vform').onsubmit = async e => {
   const btns = $$('#vbtns button'); btns.forEach(b => b.disabled = true); $('#progress').classList.remove('hidden'); $('#bar').style.width = '10%'; $('#ptext').classList.remove('text-error');
   let stage = 'Checking the form';
   try {
-    const vf = f.vfile.files[0];
+    let vf = f.vfile.files[0];
     if (!editing && !vf) throw new Error('Choose a video file to upload');
     if (!f.category.value) throw new Error('Please select a category');
     if (!f.subcategory.value) throw new Error('Please select a subcategory');
     if (vf && hashing) { $('#ptext').textContent = 'Checking for duplicates…'; await hashing; }
     if (vf && dupState === 'ask') { $('#dupmodal').classList.remove('hidden'); throw new Error('Confirm the duplicate warning first'); }
-    if (vf && !f.duration_seconds.value) throw new Error('Still analysing the video — try again in a second');
+    if (vf) {                                                                  // wait for reading / auto-conversion to finish
+      stage = 'Reading the video'; if (!f.duration_seconds.value) $('#ptext').textContent = 'Preparing the video…';
+      const r = await (prepSingle || (prepSingle = prepareVideo(vf, m => $('#ptext').textContent = m))).catch(e => { prepSingle = null; throw e; });
+      vf = r.file; if (r.thumb) thumbBlob = r.thumb;
+      const m = r.meta; if (!f.duration_seconds.value) { f.duration_seconds.value = m.duration_seconds || 1; f.resolution.value = m.resolution; f.orientation.value = m.orientation; f.fps.value = m.fps || 30; }
+      const max = (useB2() ? 500 : 50) * 1024 * 1024; if (vf.size > max) throw new Error(`video: file is over ${useB2() ? 500 : 50} MB (${mb(vf.size)})`);
+    }
     const row = {
       title: f.title.value.trim(), description: f.description.value.trim(), category: f.category.value, subcategory: f.subcategory.value,
       duration_seconds: +f.duration_seconds.value || 0, resolution: f.resolution.value || '1080p', fps: +f.fps.value || 30, orientation: f.orientation.value || 'horizontal',
@@ -734,7 +740,7 @@ $('#vform').onsubmit = async e => {
     if (vf) { const stale = [old.v, old.t].map(storagePath).filter(Boolean); if (stale.length) await sb.storage.from('videos').remove(stale); if (isSuper()) cleanStorage(); }
     toast(renamed + (!isSuper() ? 'Submitted — waiting for superadmin approval' : mode === 'approve' ? 'Approved — live on website' : 'Saved as draft (hidden from website)'));
     $('#bar').style.width = '100%'; $('#vmodal').classList.add('hidden'); loadAll();
-  } catch (err) { const why = stage === 'Checking the form' ? err.message : explainError(err, stage); toast(why, 1); $('#ptext').textContent = why; $('#ptext').classList.add('text-error'); $('#bar').style.width = '0%'; }
+  } catch (err) { const why = stage === 'Checking the form' ? err.message : convertError(err) ? 'Reading the video failed: ' + convertError(err) : explainError(err, stage); toast(why, 1); $('#ptext').textContent = why; $('#ptext').classList.add('text-error'); $('#bar').style.width = '0%'; }
   btns.forEach(b => b.disabled = false);
 };
 
@@ -786,7 +792,7 @@ function explainError(err, stage) {
 // ---------------- BULK UPLOAD ----------------
 // Many files (or a whole folder) at once. Per file: read metadata + thumbnail → fingerprint (skip/variant duplicates)
 // → AI description & tags from the title → upload video + thumbnail → save. Two files at a time; errors don't stop the rest.
-const VIDEO_EXT = /\.(mp4|mov|webm|m4v|mkv)$/i;
+const VIDEO_EXT = /\.(mp4|mov|webm|m4v|mkv|avi|wmv|flv|mpe?g|3gp|ts|mts|m2ts|ogv)$/i;
 let bq = [], bRunning = false, bStop = false;
 const bRow = it => { const col = { waiting: 'text-on-surface-variant', done: 'text-green-700', skipped: 'text-on-surface-variant', failed: 'text-error' }[it.state] || 'text-primary';
   const editable = !bRunning && (it.state === 'waiting' || it.state === 'failed'), weak = !String(it.title || '').trim();
@@ -823,10 +829,83 @@ async function entryFiles(entry, path = '') {                                   
   do { batch = await new Promise(r => rd.readEntries(r, () => r([]))); all.push(...batch); } while (batch.length);
   return (await Promise.all(all.map(e => entryFiles(e, path + entry.name + '/')))).flat();
 }
+// ---------------- AUTO-FIX VIDEOS: convert anything the browser can't play into MP4 (H.264 + AAC) ----------------
+// Runs in the browser with ffmpeg.wasm (loaded only when a file needs it, ~30 MB once, then cached by the browser).
+// One conversion at a time (memory), clips already in H.264 are just re-packaged (seconds, no quality loss).
+const NONWEB_EXT = /\.(mkv|avi|wmv|flv|mpe?g|3gp|ts|mts|m2ts|ogv)$/i, CONVERT_MAX = 400 * 1024 * 1024;
+const FF_CORE = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/';
+let ffLoad = null, ffQueue = Promise.resolve();
+async function blobURL(url, type) { const r = await fetch(url); if (!r.ok) throw new Error(`converter download failed (${r.status})`); return URL.createObjectURL(new Blob([await r.arrayBuffer()], { type })); }
+function getFF(onMsg) {
+  if (!ffLoad) ffLoad = (async () => {
+    onMsg?.('Preparing the video converter (first time only)…');
+    const { FFmpeg } = await import(new URL('../vendor/ffmpeg/index.js', import.meta.url).href);
+    const ff = new FFmpeg();
+    await ff.load({ coreURL: await blobURL(FF_CORE + 'ffmpeg-core.js', 'text/javascript'), wasmURL: await blobURL(FF_CORE + 'ffmpeg-core.wasm', 'application/wasm') });
+    return ff;
+  })().catch(e => { ffLoad = null; console.error(e); throw new Error('CONVERT_LOAD'); });
+  return ffLoad;
+}
+// Does an MP4/MOV hold HEVC (H.265)? Many browsers can't play it → convert. Only reads the file's first/last MB.
+async function isHevc(file) {
+  if (!/\.(mp4|mov|m4v)$/i.test(file.name)) return false;
+  const parts = [file.slice(0, 1 << 20), file.size > 2 << 20 ? file.slice(file.size - (1 << 20)) : null].filter(Boolean);
+  for (const b of parts) { const t = new TextDecoder('latin1').decode(await b.arrayBuffer()); if (/hvc1|hev1/.test(t)) return true; }
+  return false;
+}
+const ffInfo = log => {
+  const d = log.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/), v = log.match(/Stream #\d+:\d+[^\n]*?: Video: (\w+)[^\n]*?(\d{2,5})x(\d{2,5})/), fps = log.match(/Stream #\d+:\d+[^\n]*?: Video:[^\n]*?(\d+(?:\.\d+)?) (?:fps|tbr)/);
+  const rot = /rotate\s*:\s*-?(90|270)|rotation of -?(90|270)/.test(log);
+  return { duration: d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : 0, codec: v?.[1] || '', w: v ? +(rot ? v[3] : v[2]) : 0, h: v ? +(rot ? v[2] : v[3]) : 0, fps: fps ? +fps[1] : 30, audio: (log.match(/Stream #\d+:\d+[^\n]*?: Audio: (\w+)/) || [])[1] || '', yuv420: /yuv420p[,( ]/.test(log) };
+};
+function convertVideo(file, onMsg) {
+  const job = ffQueue.then(async () => {
+    if (file.size > CONVERT_MAX) throw new Error(`CONVERT_BIG`);
+    const ff = await getFF(onMsg); let log = '';
+    const onLog = ({ message }) => { log += message + '\n'; }, onProg = ({ progress }) => { if (progress > 0 && progress <= 1) onMsg?.(`Converting to MP4… ${Math.round(progress * 100)}%`, progress); };
+    ff.on('log', onLog); ff.on('progress', onProg);
+    const ext = (file.name.match(/\.(\w+)$/) || [, 'mp4'])[1].toLowerCase(), inp = 'in.' + ext;
+    try {
+      await ff.writeFile(inp, new Uint8Array(await file.arrayBuffer()));
+      await ff.exec(['-hide_banner', '-i', inp]).catch(() => { });           // "no output file" is expected: we only want the stream info
+      const src = ffInfo(log);
+      if (!src.codec) throw new Error("CONVERT_UNREADABLE");
+      const copy = src.codec === 'h264' && src.yuv420;                     // already H.264 → just re-package (fast, lossless)
+      onMsg?.(copy ? 'Re-packaging as MP4…' : 'Converting to MP4 (H.264)… 0%', 0);
+      log = '';
+      const code = await ff.exec(['-hide_banner', '-i', inp, '-map', '0:v:0', '-map', '0:a:0?',
+        ...(copy ? ['-c:v', 'copy'] : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2']),
+        ...(src.audio === 'aac' ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '160k']), '-movflags', '+faststart', '-y', 'out.mp4']);
+      if (code !== 0) throw new Error('CONVERT_FAILED');
+      const t = Math.min(1, (src.duration || 3) / 3);
+      await ff.exec(['-hide_banner', '-ss', String(t), '-i', 'out.mp4', '-frames:v', '1', '-vf', "scale='min(1280,iw)':-2", '-q:v', '4', '-y', 'thumb.jpg']);
+      const out = await ff.readFile('out.mp4'), th = await ff.readFile('thumb.jpg').catch(() => null);
+      const name = file.name.replace(/\.\w+$/, '') + '.mp4', big = Math.max(src.w, src.h);
+      return { file: new File([out], name, { type: 'video/mp4' }), thumb: th?.length ? new Blob([th], { type: 'image/jpeg' }) : null,
+        meta: { duration_seconds: Math.round(src.duration) || 0, resolution: big >= 3000 ? '4K' : big >= 1800 ? '1080p' : '720p', orientation: src.w > src.h ? 'horizontal' : src.w < src.h ? 'vertical' : 'square',
+          fps: [24, 25, 30, 48, 50, 60, 120].reduce((a, b) => Math.abs(b - src.fps) < Math.abs(a - src.fps) ? b : a) } };
+    } finally {
+      ff.off('log', onLog); ff.off('progress', onProg);
+      for (const f of [inp, 'out.mp4', 'thumb.jpg']) await ff.deleteFile(f).catch(() => { });
+    }
+  });
+  ffQueue = job.catch(() => { });
+  return job;
+}
+// Read a video for upload. If the browser can't play it (or it's a format websites can't show), convert it automatically.
+async function prepareVideo(file, onMsg) {
+  const needs = NONWEB_EXT.test(file.name) || await isHevc(file).catch(() => false);
+  if (!needs) { try { const m = await analyzeFile(file); return { file, meta: m, thumb: m.thumb, converted: false }; } catch { } }
+  onMsg?.('This video needs converting — converting to MP4 automatically…');
+  const r = await convertVideo(file, onMsg);
+  return { ...r, converted: true };
+}
+const convertError = e => ({ CONVERT_BIG: `too large to convert in the browser (max ${CONVERT_MAX / 1048576} MB) — export it as MP4 (H.264) and try again`,
+  CONVERT_UNREADABLE: 'this file is damaged or not a real video, so it could not be converted', CONVERT_LOAD: "couldn't load the video converter — check your internet connection and press Retry", CONVERT_FAILED: 'the automatic conversion to MP4 failed — export it as MP4 (H.264) and try again' })[e?.message] || null;
 function analyzeFile(file) {                                                    // duration, size class, orientation, fps, thumbnail
   return new Promise((ok, bad) => {
     const vid = document.createElement('video'), url = URL.createObjectURL(file); vid.muted = true; vid.playsInline = true; vid.preload = 'auto'; vid.src = url;
-    const fail = () => { URL.revokeObjectURL(url); bad(new Error("can't read this video in the browser")); }; const t = setTimeout(fail, 30000);
+    const fail = () => { URL.revokeObjectURL(url); bad(new Error("can't read this video in the browser")); }; const t = setTimeout(fail, 20000);
     vid.onerror = () => { clearTimeout(t); fail(); };
     vid.onloadedmetadata = async () => {
       const w = vid.videoWidth, h = vid.videoHeight, big = Math.max(w, h), meta = { duration_seconds: Math.round(vid.duration) || 0, resolution: big >= 3000 ? '4K' : big >= 1800 ? '1080p' : '720p', orientation: w > h ? 'horizontal' : w < h ? 'vertical' : 'square' };
@@ -852,7 +931,8 @@ async function bOne(it, opts, seen) {
     if (!VIDEO_EXT.test(it.file.name)) throw new Error(`Only video files — .${ext || '?'} is not supported`);
     const max = (useB2() ? 500 : 50) * 1024 * 1024; if (it.file.size > max) throw new Error(`over ${useB2() ? 500 : 50} MB (this file is ${mb(it.file.size)})`);
     if (!it.file.size) throw new Error("can't read this video — the file is empty");
-    const meta = await analyzeFile(it.file);
+    const prep = await prepareVideo(it.file, (m, pc) => set(m, pc === undefined ? undefined : 0.02 + pc * 0.06)), meta = prep.meta, upFile = prep.file;
+    if (prep.converted) { it.conv = true; if (upFile.size > max) throw new Error(`over ${useB2() ? 500 : 50} MB after converting (${mb(upFile.size)})`); }
     stage = 'Checking for duplicates'; set('Checking for duplicates…', 0.05); const hash = await fingerprint(it.file).catch(() => null);
     if (hash) {
       if (seen.has(hash) && opts.skip) { it.state = 'skipped'; return set('same file twice in this batch'); }
@@ -876,8 +956,8 @@ async function bOne(it, opts, seen) {
       it.cat = cat; it.sub = sub;
     }
     stage = 'Uploading the video'; set('Uploading video…', 0.1);
-    const video_url = await upload(it.file, it.file.name, 'video', pc => set(`Uploading video… ${Math.round(pc * 100)}%`, 0.1 + pc * 0.8));
-    stage = 'Uploading the thumbnail'; set('Uploading thumbnail…', 0.92); const thumbnail_url = meta.thumb ? await upload(meta.thumb, 'thumb.jpg', 'thumbnail', () => { }) : null;
+    const video_url = await upload(upFile, upFile.name, 'video', pc => set(`Uploading video… ${Math.round(pc * 100)}%`, 0.1 + pc * 0.8));
+    stage = 'Uploading the thumbnail'; set('Uploading thumbnail…', 0.92); const thumbnail_url = prep.thumb ? await upload(prep.thumb, 'thumb.jpg', 'thumbnail', () => { }) : null;
     const row = { title, description: ai?.description || '', tags: ai?.tags || [], category: cat, subcategory: sub, duration_seconds: meta.duration_seconds, resolution: meta.resolution, fps: meta.fps || 30, orientation: meta.orientation, file_hash: hash, video_url, thumbnail_url };
     if (isSuper()) { row.status = 'approved'; row.published = opts.mode === 'approve' && !weak; } else row.published = true;
     stage = 'Saving the video details'; set('Saving…', 0.97);
@@ -885,14 +965,14 @@ async function bOne(it, opts, seen) {
     if (error) { if (isSuper()) cleanStorage(); throw new Error(error.message); }
     it.saved = saved?.title || title; it.state = 'done'; it.pc = 1;
     set([saved && saved.title !== title ? (/Variant \d+$/.test(saved.title) ? 'saved as a variant' : 'title was taken — renamed') : '',
-      weak ? `no title — saved as DRAFT${it.catGuess ? ' in a placeholder category' : ''}: add a title, category & description in Videos` : ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ')
+      it.conv ? 'converted to MP4' : '', weak ? `no title — saved as DRAFT${it.catGuess ? ' in a placeholder category' : ''}: add a title, category & description in Videos` : ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ')
       || (isSuper() ? (opts.mode === 'approve' ? 'live' : 'draft') : 'sent for review'));
   } catch (e) {
     it.state = 'failed';
     const m = String(e?.message || e);
     it.msg = m === 'NOCAT' ? "Couldn't choose a category from the title. Pick a category for this batch, or make the title more descriptive, then Retry."
       : m === 'NOCAT_WEAK' ? 'No title, so no category could be chosen. Type a title (or pick a category for the batch), then Retry.'
-      : explainError(e, stage);
+      : convertError(e) || explainError(e, stage);
     bPaint(it);
   }
 }
@@ -929,7 +1009,50 @@ $('#bulkVideo').onclick = openBulk;
 $('#bcat').onchange = () => { const c = $('#bcat').value; $('#bsub').innerHTML = c === 'auto' ? '<option value="auto">Auto</option>' : '<option value="">Select subcategory</option>' + subsOf(c).map(x => `<option value="${esc(x.slug)}">${esc(x.name)}</option>`).join(''); $('#bautoHint').classList.toggle('hidden', c !== 'auto'); bPaint(); };
 $('#blist').addEventListener('input', e => { const id = e.target.dataset.bt; if (!id) return; const it = bq.find(x => x.id === id); if (it) { it.title = e.target.value; it.weak = !e.target.value.trim(); e.target.classList.toggle('border-amber-400', it.weak); const n = bq.filter(x => !String(x.title || '').trim()).length; $('#bsum').textContent = `${bq.length} video${bq.length === 1 ? '' : 's'} ready (${mb(bq.reduce((a, x) => a + x.file.size, 0))})${n ? ` · ${n} need a title` : ''}`; } });
 $('#bfiles').onchange = e => { bAdd([...e.target.files]); e.target.value = ''; };
-$('#bfolder').onchange = e => { bAdd([...e.target.files]); e.target.value = ''; };
+// ---- "Choose a folder": our own box. Drag the folder in (no browser question) or browse for it; then confirm what was found ----
+function folderBox() {
+  if (bRunning || $('#fbox')) return;
+  const w = document.createElement('div'); w.id = 'fbox'; w.className = 'fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'fboxT');
+  w.innerHTML = `<div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 login-card">
+    <div class="flex items-start gap-4"><span class="w-11 h-11 shrink-0 rounded-full grid place-items-center bg-primary-fixed text-primary"><span class="material-symbols-outlined">folder_open</span></span>
+    <div class="min-w-0 flex-1"><h2 id="fboxT" class="text-lg font-bold">Add a folder of videos</h2><p class="fsub text-sm text-on-surface-variant mt-1">Every video inside the folder (and its sub-folders) is added to the upload list. Nothing is uploaded yet.</p></div>
+    <button data-x class="material-symbols-outlined text-on-surface-variant hover:text-on-surface" aria-label="Close">close</button></div>
+    <div class="fpick mt-5"><div class="fdrop rounded-xl border-2 border-dashed border-outline-variant p-6 text-center transition"><span class="material-symbols-outlined !text-4xl text-primary">drive_folder_upload</span><p class="font-semibold mt-1">Drag the folder here</p><p class="text-xs text-on-surface-variant mt-1">Quickest way — no extra questions from the browser.</p></div>
+      <div class="flex items-center gap-3 my-4 text-xs text-on-surface-variant"><span class="flex-1 h-px bg-outline-variant/60"></span>or<span class="flex-1 h-px bg-outline-variant/60"></span></div>
+      <button data-browse class="w-full border border-outline-variant rounded-lg px-4 py-2.5 font-semibold hover:border-primary hover:text-primary flex items-center justify-center gap-2"><span class="material-symbols-outlined !text-lg">folder</span>Browse for a folder…</button>
+      <p class="text-xs text-on-surface-variant mt-2 text-center">Your browser will ask once to confirm access to that folder — choose <b>Upload</b> there. It only lets this page read the files; you confirm the upload here next.</p></div>
+    <div class="fsum hidden mt-5"></div>
+    <div class="fbtns hidden flex justify-end gap-2 mt-6"><button data-back class="px-4 py-2 rounded-lg font-semibold border border-outline-variant hover:bg-surface-container">Choose another</button><button data-add class="px-4 py-2 rounded-lg font-semibold bg-primary text-on-primary hover:brightness-95"></button></div></div>`;
+  document.body.appendChild(w);
+  let found = [];
+  const close = () => { w.remove(); document.removeEventListener('keydown', key, true); }, key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', key, true);
+  const show = (files, name) => {
+    const vids = files.filter(f => VIDEO_EXT.test(f.name) || /^video\//.test(f.type)), other = files.length - vids.length, size = vids.reduce((a, f) => a + f.size, 0);
+    const conv = vids.filter(f => NONWEB_EXT.test(f.name)).length; found = vids;
+    w.querySelector('.fpick').classList.add('hidden'); w.querySelector('.fsum').classList.remove('hidden'); w.querySelector('.fbtns').classList.remove('hidden');
+    w.querySelector('#fboxT').textContent = vids.length ? `Add ${vids.length} video${vids.length === 1 ? '' : 's'} from “${name}”?` : `No videos in “${name}”`;
+    w.querySelector('.fsub').textContent = vids.length ? 'They go to the upload list below, where you can check titles before uploading.' : 'Pick a folder that contains video files.';
+    w.querySelector('.fsum').innerHTML = `<div class="grid grid-cols-3 gap-2 text-center text-sm"><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${vids.length}</p><p class="text-xs text-on-surface-variant">videos</p></div><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${mb(size)}</p><p class="text-xs text-on-surface-variant">total size</p></div><div class="rounded-lg bg-surface-container-low p-3"><p class="text-xl font-bold">${other}</p><p class="text-xs text-on-surface-variant">other files ignored</p></div></div>
+      ${conv ? `<p class="text-xs text-on-surface-variant mt-3">${conv} file${conv === 1 ? ' is' : 's are'} in a format websites can't play — ${conv === 1 ? 'it is' : 'they are'} converted to MP4 automatically during upload.</p>` : ''}
+      ${vids.length ? `<ul class="mt-3 max-h-40 overflow-y-auto text-sm bg-surface-container-low rounded-lg px-3 py-2 space-y-1">${vids.slice(0, 40).map(f => `<li class="truncate">• ${esc(f.webkitRelativePath || f._path || f.name)}</li>`).join('')}${vids.length > 40 ? `<li class="text-on-surface-variant">…and ${vids.length - 40} more</li>` : ''}</ul>` : ''}`;
+    const add = w.querySelector('[data-add]'); add.textContent = vids.length ? `Add ${vids.length} to the list` : 'Close'; add.focus();
+  };
+  const back = () => { found = []; w.querySelector('.fpick').classList.remove('hidden'); w.querySelector('.fsum').classList.add('hidden'); w.querySelector('.fbtns').classList.add('hidden'); w.querySelector('#fboxT').textContent = 'Add a folder of videos'; };
+  const dz = w.querySelector('.fdrop');
+  dz.ondragover = e => { e.preventDefault(); dz.classList.add('border-primary', 'bg-primary-fixed/30'); }; dz.ondragleave = () => dz.classList.remove('border-primary', 'bg-primary-fixed/30');
+  dz.ondrop = async e => { e.preventDefault(); dz.classList.remove('border-primary', 'bg-primary-fixed/30');
+    const ents = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry?.()).filter(Boolean);
+    const files = ents.length ? (await Promise.all(ents.map(x => entryFiles(x)))).flat() : [...e.dataTransfer.files];
+    show(files, ents.length === 1 && ents[0].isDirectory ? ents[0].name : ents.length ? `${ents.length} items` : 'dropped files'); };
+  const inp = $('#bfolder'); inp.value = ''; inp.onchange = () => { const fs = [...inp.files]; inp.value = ''; if (fs.length && document.body.contains(w)) show(fs, (fs[0].webkitRelativePath || '').split('/')[0] || 'folder'); };
+  w.querySelector('[data-browse]').onclick = () => inp.click();
+  w.querySelector('[data-back]').onclick = back;
+  w.querySelector('[data-add]').onclick = () => { const f = found; close(); if (f.length) bAdd(f); };
+  w.querySelector('[data-x]').onclick = close; w.onclick = e => { if (e.target === w) close(); };
+  setTimeout(() => w.querySelector('[data-browse]').focus(), 30);
+}
+$('#bfolderBtn').onclick = folderBox;
 $('#bdrop').ondragover = e => { e.preventDefault(); $('#bdrop').classList.add('border-primary', 'bg-primary-fixed/30'); };
 $('#bdrop').ondragleave = () => $('#bdrop').classList.remove('border-primary', 'bg-primary-fixed/30');
 $('#bdrop').ondrop = async e => { e.preventDefault(); $('#bdrop').classList.remove('border-primary', 'bg-primary-fixed/30'); if (bRunning) return;
@@ -978,8 +1101,8 @@ function renderGuide() {
   $('#guide').innerHTML = `<div class="grid gap-4 lg:grid-cols-2">
   ${card('route', 'How it works', `<p>1. Upload with <b>Add video</b> (one clip) or <b>Bulk upload</b> (many clips or a whole folder).</p><p>2. Every upload goes to a <b>superadmin for review</b> — nothing appears on the website until it's approved.</p><p>3. Follow each video in <b>My requests</b>: <span class="text-amber-700">Waiting</span>, <span class="text-green-700">Approved · Live</span> or <span class="text-red-700">Rejected</span> (with the reason).</p><p>4. Rejected? Fix what the reason says and upload again.</p>`)}
   ${card('upload_file', 'Add video (one clip)', `<p>• Drop the file — duration, resolution, fps, orientation and thumbnail are read automatically.</p><p>• Pick the <b>category</b> and <b>subcategory</b>.</p><p>• Write a clear title; the AI fills the description and tags — check them before you press <b>Save</b>.</p>`)}
-  ${card('drive_folder_upload', 'Bulk upload (many clips)', `<p>• Choose videos, choose a folder, or drag a folder onto the box. Non-video files are ignored.</p><p>• When you choose a folder, the <b>browser</b> asks “Upload N files to this site?” — that only adds them to the list. Dragging the folder in skips that question.</p><p>• Pick a category + subcategory, or <b>✨ Auto</b> to let the AI choose one per video from its title.</p><p>• Titles come from file names — edit them in the list. Names without words (e.g. <i>8132021-hd_1920_1080_25fps</i>) are highlighted: <b>type a title</b> or they'll likely be rejected.</p><p>• Press <b>Upload</b> → a summary box shows how many videos, the category and what happens next. Confirm to start. You can hide the window; uploads continue.</p><p>• Keep <b>“Skip videos already in the library”</b> on to avoid duplicates. Failed items show the reason and a <b>Retry</b> button.</p>`)}
-  ${card('checklist', 'Good uploads get approved', `<p>• Max <b>${max} MB</b> per clip · MP4, MOV, WEBM, M4V or MKV.</p><p>• Title = what happens in the clip: <i>“Doctor explains X-ray to patient”</i>, not <i>“IMG_2231”</i>.</p><p>• 3–6 search words as tags, e.g. <i>court, judge, gavel</i>.</p><p>• Choose the most specific subcategory. Horizontal clips work best on the website.</p><p>• No logos, watermarks or faces you don't have rights to.</p>`)}
+  ${card('drive_folder_upload', 'Bulk upload (many clips)', `<p>• Choose videos, choose a folder, or drag a folder onto the box. Non-video files are ignored.</p><p>• <b>Choose a folder</b> opens a box: drag the folder in, or browse for it (the browser asks once to allow reading the folder). You then see how many videos were found and confirm.</p><p>• Pick a category + subcategory, or <b>✨ Auto</b> to let the AI choose one per video from its title.</p><p>• Titles come from file names — edit them in the list. Names without words (e.g. <i>8132021-hd_1920_1080_25fps</i>) are highlighted: <b>type a title</b> or they'll likely be rejected.</p><p>• Press <b>Upload</b> → a summary box shows how many videos, the category and what happens next. Confirm to start. You can hide the window; uploads continue.</p><p>• Keep <b>“Skip videos already in the library”</b> on to avoid duplicates. Failed items show the reason and a <b>Retry</b> button.</p>`)}
+  ${card('checklist', 'Good uploads get approved', `<p>• Max <b>${max} MB</b> per clip. Any common video format works — files the website can't play (HEVC/H.265, MKV, AVI, WMV…) are <b>converted to MP4 automatically</b> before upload (larger files take a minute).</p><p>• Title = what happens in the clip: <i>“Doctor explains X-ray to patient”</i>, not <i>“IMG_2231”</i>.</p><p>• 3–6 search words as tags, e.g. <i>court, judge, gavel</i>.</p><p>• Choose the most specific subcategory. Horizontal clips work best on the website.</p><p>• No logos, watermarks or faces you don't have rights to.</p>`)}
   ${card('checklist_rtl', 'Select several videos', `<p>• In <b>Videos</b>, press <b>Select</b>, tick videos (Shift-click selects a range, or “Select all shown”).</p><p>• <b>Withdraw my uploads</b> removes your own videos that are still waiting for review or were rejected. Approved videos can only be changed by a superadmin.</p>`)}
   ${card('content_copy', 'Duplicates', `<p>Uploading a file that's already in the library shows a warning with a preview. Continuing saves it as “Title - Variant N”. In Bulk upload, duplicates are skipped when the skip option is on.</p>`)}
   ${card('category', 'Categories', mains().map(m => `<details class="py-0.5"><summary class="cursor-pointer"><b>${esc(m.name)}</b> <span class="text-xs">(${subsOf(m.slug).length} subcategories)</span></summary><p class="mt-1 pl-4">${subsOf(m.slug).map(x => esc(x.name)).join(' · ') || '—'}</p></details>`).join(''))}
@@ -1063,17 +1186,15 @@ function renderStatus() {
     <td class="p-3 whitespace-nowrap text-on-surface-variant">${m.last_upload ? ago(m.last_upload) : '—'}</td></tr>`).join('');
 }
 // ---- Owner view: one searchable table of members + invites, inline role change, detail drawer ----
-let tq = { q: '', f: 'all', sort: 'active' }, memberDl = {}, memberDlAt = 0;
-async function loadMemberDownloads() { if (!topLevel || Date.now() - memberDlAt < 120e3) return; memberDlAt = Date.now();
-  const { data } = await sb.rpc('download_stats', { p_days: 30 }); memberDl = {}; (data?.by_member || []).forEach(m => memberDl[m.email] = m.n); if (!$('#t-team').classList.contains('hidden')) renderTeamMaster(); }
+let tq = { q: '', f: 'all', sort: 'active' };
 function renderTeamMaster() {
   const box = $('#teamFull'); if (!box.dataset.ready) {
     box.innerHTML = `<div class="flex flex-wrap items-center gap-2 mb-3"><label class="flex-1 min-w-[200px] flex items-center gap-2 bg-white border border-outline-variant rounded-lg px-3"><span class="material-symbols-outlined text-on-surface-variant !text-xl">search</span><input id="tmq" type="search" placeholder="Search by email" class="flex-1 border-0 focus:ring-0 py-2 text-sm"></label>
       <select id="tmf" aria-label="Filter" class="rounded-lg border-outline-variant text-sm"><option value="all">Everyone</option><option value="superadmin">Superadmins</option><option value="admin">Admins</option><option value="invited">Invited / not joined</option><option value="idle">Inactive 30+ days</option></select>
-      <select id="tms" aria-label="Sort" class="rounded-lg border-outline-variant text-sm"><option value="active">Recently active</option><option value="uploads">Most uploads</option><option value="downloads">Most downloads</option><option value="name">Email A–Z</option></select>
+      <select id="tms" aria-label="Sort" class="rounded-lg border-outline-variant text-sm"><option value="active">Recently active</option><option value="uploads">Most uploads</option><option value="name">Email A–Z</option></select>
       <button id="tmInv" class="bg-primary text-on-primary rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-1.5"><span class="material-symbols-outlined !text-lg">person_add</span>Invite member</button></div>
       <div id="tmForm" class="hidden mb-4"></div>
-      <div class="bg-white rounded-xl border border-outline-variant/40 overflow-x-auto"><table class="mtable w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Member</th><th class="p-3">Role</th><th class="p-3">Status</th><th class="p-3">Last sign-in</th><th class="p-3">Uploads</th><th class="p-3 text-right">Downloads <span class="font-normal">(30d)</span></th><th class="p-3"></th></tr></thead><tbody id="tmRows"></tbody></table>
+      <div class="bg-white rounded-xl border border-outline-variant/40 overflow-x-auto"><table class="mtable w-full text-sm"><thead class="text-left text-on-surface-variant border-b border-outline-variant/40"><tr><th class="p-3">Member</th><th class="p-3">Role</th><th class="p-3">Status</th><th class="p-3">Last sign-in</th><th class="p-3">Uploads</th><th class="p-3"></th></tr></thead><tbody id="tmRows"></tbody></table>
       <p id="tmEmpty" class="hidden p-6 text-center text-sm text-on-surface-variant">No members match.</p></div>`;
     box.dataset.ready = '1'; $('#tmForm').appendChild($('#addAdmin'));
     $('#tmq').oninput = e => { tq.q = e.target.value.toLowerCase(); renderTeamMaster(); };
@@ -1083,12 +1204,12 @@ function renderTeamMaster() {
     $('#tmRows').onclick = tmClick; $('#tmRows').onchange = tmRole;
   }
   const idle = m => !m.last_sign_in || Date.now() - new Date(m.last_sign_in) > 30 * 864e5;
-  const rows = [...status.map(m => ({ ...m, kind: 'member', dl: memberDl[m.email] || 0 })),
-    ...invites.filter(i => !status.some(m => (m.email || '').toLowerCase() === i.email.toLowerCase())).map(i => ({ kind: 'invite', email: i.email, role_label: i.role === 'superadmin' ? 'Superadmin' : 'Admin', account: 'Invited', joined: i.created_at, uploads: 0, live: 0, pending: 0, rejected: 0, dl: 0, invRole: i.role }))]
+  const rows = [...status.map(m => ({ ...m, kind: 'member' })),
+    ...invites.filter(i => !status.some(m => (m.email || '').toLowerCase() === i.email.toLowerCase())).map(i => ({ kind: 'invite', email: i.email, role_label: i.role === 'superadmin' ? 'Superadmin' : 'Admin', account: 'Invited', joined: i.created_at, uploads: 0, live: 0, pending: 0, rejected: 0, invRole: i.role }))]
     .filter(m => !tq.q || (m.email || '').toLowerCase().includes(tq.q))
     .filter(m => tq.f === 'all' || (tq.f === 'invited' ? m.kind === 'invite' || m.account !== 'Active' : tq.f === 'idle' ? m.kind === 'member' && idle(m) : m.kind === 'member' && (tq.f === 'superadmin' ? m.role_label !== 'Admin' : m.role_label === 'Admin')));
   const t = x => x ? +new Date(x) : 0;
-  rows.sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || ({ active: t(b.last_sign_in) - t(a.last_sign_in), uploads: b.uploads - a.uploads, downloads: b.dl - a.dl, name: (a.email || '').localeCompare(b.email || '') })[tq.sort]);
+  rows.sort((a, b) => (b.user_id === me.id) - (a.user_id === me.id) || ({ active: t(b.last_sign_in) - t(a.last_sign_in), uploads: b.uploads - a.uploads, name: (a.email || '').localeCompare(b.email || '') })[tq.sort]);
   const chip = a => ({ Active: 'bg-green-100 text-green-800', Invited: 'bg-amber-100 text-amber-800', 'Invite not accepted': 'bg-amber-100 text-amber-800' }[a] || 'bg-red-100 text-red-800');
   $('#tmRows').innerHTML = rows.map(m => { const you = m.user_id === me.id, owner = m.role_label === 'Master admin';
     return `<tr data-m="${esc(m.user_id || '')}" class="border-b border-outline-variant/30 last:border-0 hover:bg-surface-container-lowest">
@@ -1097,7 +1218,6 @@ function renderTeamMaster() {
     <td class="p-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${chip(m.account)}">${esc(m.account)}</span></td>
     <td class="p-3 whitespace-nowrap text-on-surface-variant">${m.last_sign_in ? ago(m.last_sign_in) : '—'}</td>
     <td class="p-3 whitespace-nowrap"><b>${m.uploads}</b> <span class="text-xs text-on-surface-variant">(<span class="text-green-700">${m.live} live</span>${m.pending ? ` · <span class="text-amber-700">${m.pending} pending</span>` : ''}${m.rejected ? ` · <span class="text-red-700">${m.rejected} rejected</span>` : ''})</span></td>
-    <td class="p-3 text-right tabular-nums">${m.dl}</td>
     <td class="p-3 text-right whitespace-nowrap">${m.kind === 'invite' ? `<button data-resend="${esc(m.email)}" data-irole="${esc(m.invRole)}" class="px-2 py-1 rounded text-primary font-medium hover:bg-primary-fixed/50">Resend</button><button data-uninv="${esc(m.email)}" class="px-2 py-1 rounded text-error font-medium hover:bg-red-50">Cancel</button>`
       : `${m.account === 'Invite not accepted' ? `<button data-resend="${esc(m.email)}" data-irole="${m.role_label === 'Admin' ? 'admin' : 'superadmin'}" class="px-2 py-1 rounded text-primary font-medium hover:bg-primary-fixed/50">Resend invite</button>` : ''}<button data-view="${esc(m.user_id)}" class="material-symbols-outlined p-1.5 rounded hover:bg-surface-container" title="Details">visibility</button>${you || owner ? '' : `<button data-rm="${esc(m.user_id)}" data-em="${esc(m.email)}" class="material-symbols-outlined p-1.5 rounded text-error hover:bg-red-50" title="Remove">person_remove</button>`}`}</td></tr>`; }).join('');
   $('#tmEmpty').classList.toggle('hidden', rows.length > 0);
@@ -1112,7 +1232,7 @@ function openMember(id) { const m = status.find(x => x.user_id === id); if (!m) 
   const up = videos.filter(v => v.submitted_by === id).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const st = (n, l, c = '') => `<div class="rounded-xl bg-surface-container-low p-3 text-center"><p class="text-xl font-bold ${c}">${n}</p><p class="text-xs text-on-surface-variant">${l}</p></div>`;
   $('#mbody').innerHTML = `<div class="flex items-center gap-3"><span class="w-14 h-14 rounded-full grid place-items-center text-lg font-bold ${m.role_label === 'Admin' ? 'bg-surface-container' : 'bg-primary text-on-primary'}">${initials(m.email)}</span><div class="min-w-0"><p class="font-bold text-lg truncate">${esc(m.email)}</p><p class="text-sm text-on-surface-variant">${esc(m.user_id === me.id && myTitle ? myTitle : m.role_label)} · ${esc(m.account)}</p></div></div>
-    <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mt-5"><dt class="text-on-surface-variant">Joined</dt><dd>${m.joined ? new Date(m.joined).toLocaleDateString() : '—'}</dd><dt class="text-on-surface-variant">Last sign-in</dt><dd>${m.last_sign_in ? new Date(m.last_sign_in).toLocaleString() : 'Never'}</dd><dt class="text-on-surface-variant">Last upload</dt><dd>${m.last_upload ? ago(m.last_upload) : '—'}</dd><dt class="text-on-surface-variant">Downloads (30 days)</dt><dd>${memberDl[m.email] || 0}</dd></dl>
+    <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mt-5"><dt class="text-on-surface-variant">Joined</dt><dd>${m.joined ? new Date(m.joined).toLocaleDateString() : '—'}</dd><dt class="text-on-surface-variant">Last sign-in</dt><dd>${m.last_sign_in ? new Date(m.last_sign_in).toLocaleString() : 'Never'}</dd><dt class="text-on-surface-variant">Last upload</dt><dd>${m.last_upload ? ago(m.last_upload) : '—'}</dd></dl>
     <div class="grid grid-cols-4 gap-2 mt-5">${st(m.uploads, 'Uploads')}${st(m.live, 'Live', 'text-green-700')}${st(m.pending, 'Pending', 'text-amber-700')}${st(m.rejected, 'Rejected', 'text-red-700')}</div>
     <h3 class="font-semibold mt-6 mb-2">Recent uploads</h3>
     <div class="space-y-2">${up.slice(0, 8).map(v => { const [l, c] = statusLabel(v); return `<div class="flex items-center gap-3"><div class="w-16 aspect-video rounded bg-surface-container overflow-hidden shrink-0">${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" class="w-full h-full object-cover" alt="">` : ''}</div><div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${esc(v.title)}</p><p class="text-xs text-on-surface-variant">${ago(v.created_at)}</p></div><span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${c}">${l}</span></div>`; }).join('') || '<p class="text-sm text-on-surface-variant">No uploads yet.</p>'}</div>
@@ -1129,7 +1249,7 @@ function renderTeam() {
   if (topLevel) { const idle = status.filter(m => m.last_sign_in && Date.now() - new Date(m.last_sign_in) < 7 * 864e5).length;
     const st = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${i}</span></span><div><p class="text-2xl font-bold leading-none">${n}</p><p class="text-xs text-on-surface-variant mt-1">${l}</p></div></div>`;
     $('#teamStats').innerHTML = st('groups', status.length, 'Members') + st('bolt', idle, 'Active this week') + st('shield_person', status.filter(m => m.role_label !== 'Admin').length, 'Superadmins & you') + st('mail', invites.length + status.filter(m => m.account === 'Invite not accepted').length, 'Not joined yet');
-    renderTeamMaster(); loadMemberDownloads(); return; }
+    renderTeamMaster(); return; }
   renderStatus();
   const st = (i, n, l) => `<div class="bg-white rounded-xl border border-outline-variant/40 p-4 flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-primary-fixed text-primary grid place-items-center"><span class="material-symbols-outlined">${i}</span></span><div><p class="text-2xl font-bold leading-none">${n}</p><p class="text-xs text-on-surface-variant mt-1">${l}</p></div></div>`;
   $('#teamStats').innerHTML = st('groups', team.length, 'Members') + st('shield_person', team.filter(t => lvl(t.role) === 'superadmin').length, 'Superadmins') + st('person', team.filter(t => t.role === 'admin').length, 'Admins') + st('mail', invites.length, 'Pending invites');
