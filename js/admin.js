@@ -1,6 +1,6 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const C = window.ES_CONFIG;
-const BUILD = '2026-10-01d'; window.ES_ADMIN_BUILD = BUILD;                                                     // must match data-build in admin.html (detects half-updated uploads / old cached files)
+const BUILD = '2026-10-01f'; window.ES_ADMIN_BUILD = BUILD;                                                     // must match data-build in admin.html (detects half-updated uploads / old cached files)
 if (document.documentElement.dataset.build !== BUILD) document.addEventListener('DOMContentLoaded', () => document.body.insertAdjacentHTML('afterbegin', `<div role="alert" class="fixed top-0 inset-x-0 z-[95] bg-red-600 text-white text-sm text-center px-4 py-2">This page is running mixed old/new files (admin.html build ${document.documentElement.dataset.build || '?'}, admin.js build ${BUILD}). Re-upload ALL site files, then press Ctrl+Shift+R.</div>`));
 // Read email-link params BEFORE the client consumes the URL hash
 const QS = new URLSearchParams(location.search), HP = new URLSearchParams(location.hash.slice(1));
@@ -692,20 +692,31 @@ async function upload(fileOrBlob, name, label, onProgress) {
   onProgress?.(1);
   return sb.storage.from('videos').getPublicUrl(path).data.publicUrl;
 }
-// Browser → B2 directly (the server only signs a 15-minute upload link), with a real progress bar
+// Browser → B2 directly (the server only signs a 15-minute upload link), with a real progress bar.
+// Temporary B2 problems (5xx, 429, dropped connection, timeout) are retried automatically: 3 tries, fresh link each time.
 async function uploadB2(file, name, onProgress) {
-  const { data, error } = await sb.functions.invoke('b2-sign', { body: { action: 'upload', name, size: file.size } });
-  if (error || !data?.url) throw new Error('video: ' + (data?.error || await fnError(error) || 'could not start upload'));
-  await new Promise((ok, bad) => {
-    const x = new XMLHttpRequest(); x.open('PUT', data.url); x.setRequestHeader('Content-Type', data.contentType || file.type || 'application/octet-stream');
-    x.upload.onprogress = e => { if (!e.lengthComputable) return; const pc = e.loaded / e.total;
-      if (onProgress) onProgress(pc); else { $('#bar').style.width = (10 + pc * 60).toFixed(0) + '%'; $('#ptext').textContent = `Uploading video… ${Math.round(pc * 100)}%`; } };
-    x.onload = () => x.status >= 200 && x.status < 300 ? ok() : bad(new Error(x.status === 413 ? 'Payload too large (413)' : x.status >= 500 ? `storage server error (${x.status})` : `storage refused the upload (${x.status})`));
-    x.onerror = () => bad(new Error('network: upload failed — no connection to storage (or blocked by CORS)'));
-    x.ontimeout = () => bad(new Error('network: upload timed out'));
-    x.send(file);
-  });
-  return data.path;
+  const say = t => { if (!onProgress) $('#ptext').textContent = t; else onProgress(0, t); };
+  for (let attempt = 1; ; attempt++) {
+    const { data, error } = await sb.functions.invoke('b2-sign', { body: { action: 'upload', name, size: file.size } });
+    if (error || !data?.url) throw new Error('video: ' + (data?.error || await fnError(error) || 'could not start upload'));
+    try {
+      await new Promise((ok, bad) => {
+        const x = new XMLHttpRequest(); x.open('PUT', data.url); x.setRequestHeader('Content-Type', data.contentType || file.type || 'application/octet-stream');
+        x.upload.onprogress = e => { if (!e.lengthComputable) return; const pc = e.loaded / e.total;
+          if (onProgress) onProgress(pc); else { $('#bar').style.width = (10 + pc * 60).toFixed(0) + '%'; $('#ptext').textContent = `Uploading video… ${Math.round(pc * 100)}%`; } };
+        const fail = (msg, retry) => { const e = new Error(msg); e.retry = retry; bad(e); };
+        x.onload = () => x.status >= 200 && x.status < 300 ? ok() : fail(x.status === 413 ? 'Payload too large (413)' : x.status >= 500 ? `storage server error (${x.status})` : `storage refused the upload (${x.status})`, x.status >= 500 || x.status === 429 || x.status === 408);
+        x.onerror = () => fail('network: upload failed — no connection to storage (or blocked by CORS)', true);
+        x.ontimeout = () => fail('network: upload timed out', true);
+        x.send(file);
+      });
+      return data.path;
+    } catch (e) {
+      if (!e.retry || attempt >= 3) throw e;
+      const wait = attempt === 1 ? 3 : 8;
+      say(`Storage hiccup — retrying (${attempt + 1}/3) in ${wait}s…`); await new Promise(r => setTimeout(r, wait * 1000));
+    }
+  }
 }
 async function fnError(e) { try { const b = await e?.context?.json?.(); return b?.error || e?.message; } catch { return e?.message; } }
 $('#vform').onsubmit = async e => {
@@ -758,14 +769,14 @@ function cleanTitle(fileName) {
   return real.length ? { title, weak: false } : { title: '', weak: true };
 }
 // Local fallback when the AI can't choose: score each subcategory by matching words (+ a few synonyms per main category)
-const CAT_HINTS = { lawyers: 'law legal lawyer lawyers attorney attorneys court courtroom judge gavel justice contract contracts signing notary firm advocate verdict trial jury scales document documents legal-office', doctors: 'doctor doctors medical medicine hospital clinic nurse nurses patient patients surgery surgeon health healthcare stethoscope pharmacy lab laboratory xray x-ray mri scan dentist therapy care' };
+const CAT_HINTS = { lawyers: 'law legal lawyer lawyers attorney attorneys court courtroom judge gavel justice contract contracts signing notary firm advocate verdict trial jury scales document documents legal-office police officer officers cop security crime criminal arrest prison jail detective investigation lawsuit settlement business businessman businesswoman office meeting negotiation handshake agreement deal property estate insurance accident injury-claim divorce family immigration employment corporate', doctors: 'doctor doctors medical medicine hospital clinic nurse nurses patient patients surgery surgeon health healthcare stethoscope pharmacy lab laboratory xray x-ray mri scan dentist therapy care wheelchair disability disabled elderly senior seniors aging rehab rehabilitation physiotherapy physio injury recovery wellness fitness exercise yoga nutrition diet mental stress anxiety depression pregnant pregnancy baby newborn child pediatric vaccine vaccination medicine pills prescription ambulance emergency blood heart brain dental teeth skin sick illness caregiver' };
 function guessCategory(text, onlyCat) {
   const w = new Set(String(text || '').toLowerCase().split(/[^a-z0-9-]+/).filter(x => x.length > 2)); if (!w.size) return null;
   const hit = str => String(str || '').toLowerCase().split(/[^a-z0-9-]+/).filter(x => x.length > 2 && w.has(x)).length;
   let best = null;
   for (const m of mains()) { if (onlyCat && m.slug !== onlyCat) continue;
     const base = hit(m.name + ' ' + m.slug + ' ' + (CAT_HINTS[m.slug] || ''));
-    for (const sb_ of subsOf(m.slug)) { const sc = base + 2 * hit(sb_.name + ' ' + sb_.slug); if (sc > 0 && (!best || sc > best.sc)) best = { cat: m.slug, sub: sb_.slug, sc }; }
+    for (const sb_ of subsOf(m.slug)) { const sh = hit(sb_.name + ' ' + sb_.slug), sc = base + 2 * sh; if (sc > 0 && (!best || sc > best.sc)) best = { cat: m.slug, sub: sb_.slug, sc, subHit: sh > 0 }; }
     if (base > 0 && (!best || base > best.sc)) best = { cat: m.slug, sub: subsOf(m.slug)[0]?.slug || '', sc: base };
   }
   return best && best.sub ? best : null;
@@ -922,7 +933,10 @@ function analyzeFile(file) {                                                    
 }
 async function aiFor(title, withCats) {                                         // same server function as the single form
   const body = withCats ? { title, categories: catTree(), autocreate: true } : { title };   // autocreate: the AI may add a fitting subcategory (any role)
-  for (let i = 0; i < 2; i++) { try { const { data, error } = await sb.functions.invoke('ai-describe', { body }); if (!error && data && !data.error) return data; } catch { } }
+  for (let i = 0; i < 4; i++) {                                                 // AI can be briefly busy (rate limit) during big batches → wait and retry
+    try { const { data, error } = await sb.functions.invoke('ai-describe', { body }); if (!error && data && !data.error) return data; } catch { }
+    if (i < 3) await new Promise(r => setTimeout(r, [1500, 4000, 9000][i]));
+  }
   return null;
 }
 // Create (once) a subcategory the AI proposed when none of the existing ones fit. Reused by later videos in the batch.
@@ -945,7 +959,7 @@ async function bOne(it, opts, seen) {
   const set = (msg, pc) => { it.msg = msg; if (pc !== undefined) it.pc = pc; bPaint(it); };
   let stage = 'Reading the video';
   try {
-    it.state = 'working'; it.cat = it.sub = ''; it.catGuess = false; set('Reading video…', 0.02);
+    it.state = 'working'; it.cat = it.sub = ''; it.catGuess = false; it.forceDraft = false; it.newSub = null; set('Reading video…', 0.02);
     const ext = (it.file.name.match(/\.(\w+)$/) || [])[1] || '';
     if (!VIDEO_EXT.test(it.file.name)) throw new Error(`Only video files — .${ext || '?'} is not supported`);
     const max = (useB2() ? 500 : 50) * 1024 * 1024; if (it.file.size > max) throw new Error(`over ${useB2() ? 500 : 50} MB (this file is ${mb(it.file.size)})`);
@@ -974,24 +988,24 @@ async function bOne(it, opts, seen) {
       if (isMain && subsOf(ai.category).some(x => x.slug === ai.subcategory)) { cat = ai.category; sub = ai.subcategory; }
       else if (isMain && ai.new_subcategory && isSuper()) {                        // nothing fits → create a fitting subcategory (superadmin/owner)
         stage = 'Creating a new subcategory'; cat = ai.category; const made = await ensureSub(cat, ai.new_subcategory); sub = made.slug; if (made.created) it.newSub = made.name; }
-      else if (isMain && subsOf(ai.category).length) { cat = ai.category; sub = guessCategory(txt, cat)?.sub || subsOf(cat)[0].slug; it.catGuess = !guessCategory(txt, cat); }
+      else if (isMain && subsOf(ai.category).length) { cat = ai.category; const g = guessCategory(txt, cat); sub = g?.sub || subsOf(cat)[0].slug; it.catGuess = !g?.subHit; }
       else { const g = guessCategory(txt) || (weak ? guessCategory((it.path || '').split('/').slice(0, -1).join(' ')) : null);   // nameless file: try its folder name
         if (g) { cat = g.cat; sub = g.sub; }
         else if (weak) { cat = mains()[0]?.slug; sub = subsOf(cat)[0]?.slug; it.catGuess = true; if (!cat || !sub) throw new Error('NOCAT_WEAK'); }   // draft anyway; category must be checked
-        else throw new Error('NOCAT'); }
+        else { cat = mains()[0]?.slug; sub = subsOf(cat)[0]?.slug; it.catGuess = true; it.forceDraft = true; if (!cat || !sub) throw new Error('NOCAT'); } }   // never block the upload: park it as a draft to check
       it.cat = cat; it.sub = sub;
     }
     stage = 'Uploading the video'; set('Uploading video…', 0.1);
-    const video_url = await upload(upFile, upFile.name, 'video', pc => set(`Uploading video… ${Math.round(pc * 100)}%`, 0.1 + pc * 0.8));
+    const video_url = await upload(upFile, upFile.name, 'video', (pc, t) => set(t || `Uploading video… ${Math.round(pc * 100)}%`, 0.1 + pc * 0.8));
     stage = 'Uploading the thumbnail'; set('Uploading thumbnail…', 0.92); const thumbnail_url = prep.thumb ? await upload(prep.thumb, 'thumb.jpg', 'thumbnail', () => { }) : null;
     const row = { title, description: ai?.description || '', tags: ai?.tags || [], category: cat, subcategory: sub, duration_seconds: meta.duration_seconds, resolution: meta.resolution, fps: meta.fps || 30, orientation: meta.orientation, file_hash: hash, video_url, thumbnail_url };
-    if (isSuper()) { row.status = 'approved'; row.published = opts.mode === 'approve' && !weak; } else row.published = true;
+    if (isSuper()) { row.status = 'approved'; row.published = opts.mode === 'approve' && !weak && !it.forceDraft; } else row.published = true;
     stage = 'Saving the video details'; set('Saving…', 0.97);
     const { data: saved, error } = await sb.from('videos').insert(row).select('title').maybeSingle();
     if (error) { if (isSuper()) cleanStorage(); throw new Error(error.message); }
     it.saved = saved?.title || title; it.state = 'done'; it.pc = 1;
     set([saved && saved.title !== title ? (/Variant \d+$/.test(saved.title) ? 'saved as a variant' : 'title was taken — renamed') : '',
-      it.conv ? 'converted to MP4' : '', it.newSub ? `new subcategory “${it.newSub}” created` : '', it.catGuess && !weak ? 'closest subcategory picked — check it in Videos' : '', weak ? `no title — saved as DRAFT${it.catGuess ? ' in a placeholder category' : ''}: add a title, category & description in Videos` : ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ')
+      it.conv ? 'converted to MP4' : '', it.newSub ? `new subcategory “${it.newSub}” created` : '', it.forceDraft && !weak ? `AI was busy — placed in ${cname(it.cat)} › ${cname(it.sub)}${isSuper() ? ' as a DRAFT' : ''}: please check the category` : it.catGuess && !weak ? 'closest subcategory picked — check it in Videos' : '', weak ? `no title — saved as DRAFT${it.catGuess ? ' in a placeholder category' : ''}: add a title, category & description in Videos` : ai ? '' : 'AI unavailable — add description later'].filter(Boolean).join(' · ')
       || (isSuper() ? (opts.mode === 'approve' ? 'live' : 'draft') : 'sent for review'));
   } catch (e) {
     it.state = 'failed';
